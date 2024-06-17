@@ -6,8 +6,8 @@ dependencyResolutionManagement { DependencyResolutionManagement it ->
             version('slf4j', '2.0.13')
             version('micrometer', '1.12.5')
             version('reactor', '3.6.5')
-            version('kotlin_', '1.9.10') //Visit https://kotlinlang.org/docs/releases.html#release-details to see versions compatability
-            version('kotlin-coroutines', '1.7.3')
+            version('kotlin_', '2.0.0') //Visit https://kotlinlang.org/docs/releases.html#release-details to see versions compatability
+            version('kotlin-coroutines', '1.9.0-RC')
             version('jackson', '2.17.0')
             version('mockserver', '5.15.0')
             version('netty', '4.1.109.Final')
@@ -17,8 +17,7 @@ dependencyResolutionManagement { DependencyResolutionManagement it ->
             version('cassandra', '4.17.0')
             version('grpc-java', '1.63.0')
             version('grpc-kotlin', '1.4.1')
-            version('kotlin-testing', '1.5.0')
-            version('ksp', '1.9.10-1.0.13')
+            version('ksp', '2.0.0-1.0.22')
             version('kotlinpoet', '1.16.0')
             version('swagger', '2.2.21')
             version('opentelemetry', '1.37.0')
@@ -145,7 +144,6 @@ dependencyResolutionManagement { DependencyResolutionManagement it ->
 
             library('ksp-api', 'com.google.devtools.ksp', 'symbol-processing-api').versionRef('ksp')
             library('ksp', 'com.google.devtools.ksp', 'symbol-processing').versionRef('ksp')
-            library('kotlin-compile-testing', 'com.github.tschuchortdev', 'kotlin-compile-testing').versionRef("kotlin-testing")
 
             library('kotlinpoet', 'com.squareup', 'kotlinpoet').versionRef('kotlinpoet')
             library('kotlinpoet-ksp', 'com.squareup', 'kotlinpoet-ksp').versionRef('kotlinpoet')

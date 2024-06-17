@@ -1,84 +1,88 @@
 package ru.tinkoff.kora.kora.app.ksp
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 
-class ConflictResolutionTest : AbstractSymbolProcessorTest() {
+class ConflictResolutionTest : AbstractKoraAppProcessorTest() {
     @Test
     fun testMultipleComponentSameType() {
-        compile0(
+        compile0(listOf(KoraAppProcessorProvider()),
             """
             interface TestInterface            
             """.trimIndent(),
             """
-                        class TestImpl1 : TestInterface {}
-                        """.trimIndent(), """
-                                    class TestImpl2 : TestInterface {}
-                                    """.trimIndent(), """
-                                                @KoraApp
-                                                interface ExampleApplication {
-                                                    @Root
-                                                    fun root(t: TestInterface) = ""
-                                                    fun testImpl1() = TestImpl1()
-                                                    fun testImpl2() = TestImpl2()
-                                                }
-                                                
-                                                """.trimIndent()
+            class TestImpl1 : TestInterface {}
+            """.trimIndent(),
+            """
+            class TestImpl2 : TestInterface {}
+            """.trimIndent(),
+            """
+            @KoraApp
+            interface ExampleApplication {
+                @Root
+                fun root(t: TestInterface) = ""
+                fun testImpl1() = TestImpl1()
+                fun testImpl2() = TestImpl2()
+            }
+            
+            """.trimIndent()
         )
 
-        assertThat(compileResult.isFailed()).isTrue()
+        compileResult.assertFailure()
     }
 
     @Test
     fun testDefaultComponentOverride() {
-        compile0(
+        compile0(listOf(KoraAppProcessorProvider()),
             """
             interface TestInterface            
             """.trimIndent(),
             """
-                        class TestImpl1 : TestInterface {}
-                        """.trimIndent(), """
-                                    class TestImpl2 : TestInterface {}
-                                    """.trimIndent(), """
-                                                @KoraApp
-                                                interface ExampleApplication {
-                                                    @Root
-                                                    fun root(t: TestInterface) = ""
-                                                
-                                                    fun testImpl1() = TestImpl1()
-                                    
-                                                    @DefaultComponent
-                                                    fun testImpl2() = TestImpl2()
-                                                }
-                                                """.trimIndent()
+            class TestImpl1 : TestInterface {}
+            """.trimIndent(),
+            """
+            class TestImpl2 : TestInterface {}
+            """.trimIndent(),
+            """
+            @KoraApp
+            interface ExampleApplication {
+                @Root
+                fun root(t: TestInterface) = ""
+            
+                fun testImpl1() = TestImpl1()
+            
+                @DefaultComponent
+                fun testImpl2() = TestImpl2()
+            }
+            """.trimIndent()
         )
 
-        assertThat(compileResult.isFailed()).isFalse()
+        compileResult.assertSuccess()
     }
 
     @Test
     fun testDefaultComponentTemplateOverride() {
-        compile0(
+        compile0(listOf(KoraAppProcessorProvider()),
             """
             interface TestInterface <T>
             """.trimIndent(),
             """
-                        class TestImpl1 <T> : TestInterface <T> {}
-                        """.trimIndent(), """
-                                    class TestImpl2 <T> : TestInterface <T> {}
-                                    """.trimIndent(), """
-                                                @KoraApp
-                                                interface ExampleApplication {
-                                                    @Root
-                                                    fun root(t: TestInterface<String>) = ""
-                                                
-                                                    fun <T> testImpl1() = TestImpl1<T>()
-                                    
-                                                    @DefaultComponent
-                                                    fun <T> testImpl2() = TestImpl2<T>()
-                                                }
-                                                """.trimIndent()
+            class TestImpl1 <T> : TestInterface <T> {}
+            """.trimIndent(),
+            """
+            class TestImpl2 <T> : TestInterface <T> {}
+            """.trimIndent(),
+            """
+            @KoraApp
+            interface ExampleApplication {
+                @Root
+                fun root(t: TestInterface<String>) = ""
+            
+                fun <T> testImpl1() = TestImpl1<T>()
+            
+                @DefaultComponent
+                fun <T> testImpl2() = TestImpl2<T>()
+            }
+            """.trimIndent()
         )
 
         compileResult.assertSuccess()

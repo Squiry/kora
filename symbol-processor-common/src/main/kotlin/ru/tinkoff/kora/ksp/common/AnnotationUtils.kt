@@ -1,5 +1,6 @@
 package ru.tinkoff.kora.ksp.common
 
+import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSTypeReference
@@ -55,10 +56,9 @@ object AnnotationUtils {
         .firstOrNull()
 
     inline fun <reified T> KSAnnotation.findValueNoDefault(name: String): T? {
-        val defaultValues = defaultArguments
         return this.arguments.asSequence()
+            .filter { !it.isDefault() }
             .filter { it.name!!.asString() == name }
-            .filter { !defaultValues.contains(it) }
             .map { it.value!! }
             .map { it as T }
             .firstOrNull()

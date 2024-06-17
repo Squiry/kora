@@ -1,9 +1,12 @@
 package ru.tinkoff.kora.kora.app.ksp.component
 
 import com.google.devtools.ksp.symbol.KSType
+import com.squareup.kotlinpoet.ksp.toTypeName
 import ru.tinkoff.kora.ksp.common.CommonClassNames
 
 data class DependencyClaim(val type: KSType, val tags: Set<String>, val claimType: DependencyClaimType) {
+    var typeName = type.toTypeName()
+
     fun tagsMatches(other: Collection<String?>): Boolean {
         if (tags.isEmpty() && other.isEmpty()) {
             return true

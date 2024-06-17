@@ -77,9 +77,7 @@ abstract class AbstractHttpClientTest : AbstractSymbolProcessorTest() {
 
     protected fun compile(arguments: List<Any?>, @Language("kotlin") vararg sources: String): TestObject {
         val compileResult = compile0(*sources)
-        if (compileResult.isFailed()) {
-            throw compileResult.compilationException()
-        }
+        compileResult.assertSuccess()
 
         val clientClass = compileResult.loadClass("\$TestClient_ClientImpl");
         val durationCVE = DurationConfigValueExtractor();

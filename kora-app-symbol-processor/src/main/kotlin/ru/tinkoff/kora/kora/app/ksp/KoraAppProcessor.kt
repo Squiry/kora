@@ -21,7 +21,6 @@ import ru.tinkoff.kora.kora.app.ksp.component.ResolvedComponent
 import ru.tinkoff.kora.kora.app.ksp.declaration.ComponentDeclaration
 import ru.tinkoff.kora.kora.app.ksp.declaration.ModuleDeclaration
 import ru.tinkoff.kora.kora.app.ksp.exception.NewRoundException
-import ru.tinkoff.kora.kora.app.ksp.interceptor.ComponentInterceptors
 import ru.tinkoff.kora.ksp.common.*
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.isAnnotationPresent
@@ -100,11 +99,11 @@ class KoraAppProcessor(
     override fun processRound(resolver: Resolver): List<KSAnnotated> {
         this.resolver = resolver
 
-        if (ctx == null) {
+//        if (ctx == null) {
             ctx = ProcessingContext(resolver, kspLogger, codeGenerator)
-        } else {
-            ctx!!.resolver = resolver
-        }
+//        } else {
+//            ctx!!.resolver = resolver
+//        }
 
         val newModules = this.processModules(resolver)
         val newComponents = this.processComponents(resolver)
@@ -330,10 +329,8 @@ class KoraAppProcessor(
     }
 
     private fun write(declaration: KSClassDeclaration, allModules: List<KSClassDeclaration>, components: List<ResolvedComponent>) {
-        val interceptors: ComponentInterceptors = ComponentInterceptors.parseInterceptors(ctx!!, components)
-        kspLogger.logging("Found interceptors: $interceptors")
         val applicationImplFile = this.generateImpl(declaration, allModules)
-        val applicationGraphFile = this.generateApplicationGraph(resolver, declaration, allModules, components, interceptors)
+        val applicationGraphFile = this.generateApplicationGraph(declaration, allModules, components)
         applicationImplFile.writeTo(codeGenerator = codeGenerator, aggregating = true)
         applicationGraphFile.writeTo(codeGenerator = codeGenerator, aggregating = true)
     }
@@ -451,13 +448,10 @@ class KoraAppProcessor(
     }
 
     private fun generateApplicationGraph(
-        resolver: Resolver,
         declaration: KSClassDeclaration,
         allModules: List<KSClassDeclaration>,
-        graph: List<ResolvedComponent>,
-        interceptors: ComponentInterceptors
+        graph: List<ResolvedComponent>
     ): FileSpec {
-        val supplier: KSClassDeclaration = resolver.getClassDeclarationByName(Supplier::class.qualifiedName.toString())!!
         val containingFile = declaration.containingFile!!
         val packageName = containingFile.packageName.asString()
         val graphName = "${declaration.simpleName.asString()}Graph"
@@ -469,7 +463,7 @@ class KoraAppProcessor(
         )
 
         val implClass = ClassName(packageName, "${declaration.simpleName.asString()}Impl")
-        val supplierSuperInterface = supplier.toClassName().parameterizedBy(CommonClassNames.applicationGraphDraw)
+        val supplierSuperInterface = Supplier::class.asClassName().parameterizedBy(CommonClassNames.applicationGraphDraw)
         val classBuilder = TypeSpec.classBuilder(graphName)
             .addOriginatingKSFile(containingFile)
             .generated(KoraAppProcessor::class)
@@ -523,8 +517,8 @@ class KoraAppProcessor(
                 }
             }
             val component = graph[i];
-            currentClass!!.addProperty(component.fieldName, CommonClassNames.node.parameterizedBy(component.type.toTypeName()))
-            val statement = this.generateComponentStatement(allModules, interceptors, graph, component)
+            currentClass!!.addProperty(component.fieldName, CommonClassNames.node.parameterizedBy(component.typeName))
+            val statement = this.generateComponentStatement(allModules, graph, component)
             currentConstructor!!.addCode(statement).addCode("\n")
         }
         if (graph.isNotEmpty()) {
@@ -563,7 +557,6 @@ class KoraAppProcessor(
 
     private fun generateComponentStatement(
         allModules: List<KSClassDeclaration>,
-        interceptors: ComponentInterceptors,
         components: List<ResolvedComponent>,
         component: ResolvedComponent
     ): CodeBlock {
@@ -633,7 +626,7 @@ class KoraAppProcessor(
         }
         statement.add(" },\n")
         statement.add("listOf(")
-        for ((i, interceptor) in interceptors.interceptorsFor(declaration).withIndex()) {
+        for ((i, interceptor) in component.interceptors.withIndex()) {
             if (i > 0) {
                 statement.add(", ")
             }
@@ -706,7 +699,7 @@ class KoraAppProcessor(
             if (i > 0) {
                 block.add(",\n")
             }
-            block.add(dependency.write(ctx!!, components))
+            block.add(dependency.write())
         }
         block.unindent().add("\n")
         return block.build()

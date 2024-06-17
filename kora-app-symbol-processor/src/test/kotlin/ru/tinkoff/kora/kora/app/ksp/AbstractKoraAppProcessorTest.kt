@@ -14,10 +14,8 @@ abstract class AbstractKoraAppProcessorTest : AbstractSymbolProcessorTest() {
 
 
     protected fun compile(@Language("kotlin") vararg sources: String): ApplicationGraphDraw {
-        val compileResult = compile0(*sources)
-        if (compileResult.isFailed()) {
-            throw compileResult.compilationException()
-        }
+        compileResult = compile0(listOf(KoraAppProcessorProvider()), *sources)
+        compileResult.assertSuccess()
 
         val appClass = compileResult.loadClass("ExampleApplicationGraph")
         val `object` = appClass.getConstructor().newInstance() as Supplier<ApplicationGraphDraw>

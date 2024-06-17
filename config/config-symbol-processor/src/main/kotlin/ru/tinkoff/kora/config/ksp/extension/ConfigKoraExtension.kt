@@ -17,7 +17,6 @@ import ru.tinkoff.kora.ksp.common.generatedClassName
 class ConfigKoraExtension(resolver: Resolver, private val codeGenerator: CodeGenerator) : KoraExtension {
     private val configValueExtractorTypeErasure = resolver.getClassDeclarationByName(ConfigClassNames.configValueExtractor.canonicalName)!!.asStarProjectedType()
     private val configParserGenerator = ConfigParserGenerator(resolver)
-    private val recordType = resolver.getClassDeclarationByName(Record::class.qualifiedName!!)!!.asStarProjectedType()
 
     override fun getDependencyGenerator(resolver: Resolver, type: KSType, tags: Set<String>): (() -> ExtensionResult)? {
         if (tags.isNotEmpty()) return null

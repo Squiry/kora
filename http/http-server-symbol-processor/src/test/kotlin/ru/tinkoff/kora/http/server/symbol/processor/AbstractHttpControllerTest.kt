@@ -63,9 +63,8 @@ abstract class AbstractHttpControllerTest : AbstractSymbolProcessorTest() {
 
     protected fun compile(@Language("kotlin") vararg sources: String): HttpControllerModule {
         val compileResult = compile0(*sources)
-        if (compileResult.isFailed()) {
-            throw compileResult.compilationException()
-        }
+        compileResult.assertSuccess()
+
         val moduleClass = compileResult.loadClass("ControllerModule")
         val controllerClass = compileResult.loadClass("Controller")
         val moduleObject = Proxy.newProxyInstance(compileResult.classLoader, arrayOf(moduleClass)) { proxy: Any, method: Method?, args: Array<Any?> ->

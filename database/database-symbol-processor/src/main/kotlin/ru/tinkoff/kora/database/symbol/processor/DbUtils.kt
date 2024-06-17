@@ -10,6 +10,7 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import ru.tinkoff.kora.database.symbol.processor.model.QueryParameter
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findValue
+import ru.tinkoff.kora.ksp.common.AnnotationUtils.findValueNoDefault
 import ru.tinkoff.kora.ksp.common.CommonAopUtils.overridingKeepAop
 import ru.tinkoff.kora.ksp.common.FieldFactory
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
@@ -89,7 +90,7 @@ object DbUtils {
 
     fun KSClassDeclaration.parseExecutorTag(): CodeBlock? {
         val repository = this.findAnnotation(repositoryAnnotation)!!
-        val executorTag = repository.findValue<KSAnnotation>("executorTag")
+        val executorTag = repository.findValueNoDefault<KSAnnotation>("executorTag")
         if (executorTag == null) {
             return null
         }

@@ -13,14 +13,11 @@ import ru.tinkoff.kora.json.ksp.AbstractJsonSymbolProcessorTest.Companion.reader
 import ru.tinkoff.kora.json.ksp.AbstractJsonSymbolProcessorTest.Companion.writer
 import ru.tinkoff.kora.json.ksp.AbstractJsonSymbolProcessorTest.Companion.writerClass
 import ru.tinkoff.kora.json.ksp.dto.*
-import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
 import ru.tinkoff.kora.ksp.common.symbolProcess
-import ru.tinkoff.kora.ksp.common.symbolProcessJava
 import java.io.IOException
 import java.io.StringWriter
 import java.math.BigDecimal
 import java.math.BigInteger
-import java.util.function.Supplier
 import kotlin.reflect.KClass
 
 @KspExperimental
@@ -375,43 +372,6 @@ internal class JsonAnnotationProcessorTest {
         }
             .isInstanceOf(JsonParseException::class.java)
             .hasMessageStartingWith("Expecting [VALUE_STRING] token for field 'field1', got VALUE_NULL")
-    }
-
-
-    @Test
-    fun testJavaRecord() {
-        val cl = JsonClassLoader(symbolProcessJava(JavaRecordDto::class.java, JsonSymbolProcessorProvider()))
-        val intReader = JsonReader<Int> { it.intValue }
-        val booleanReader = JsonReader<Boolean> { it.booleanValue }
-        val stringJsonReader: JsonReader<String> = JsonReader { parser: JsonParser -> parser.text }
-        val reader: JsonReader<JavaRecordDto?> = cl.reader(
-            JavaRecordDto::class.java,
-            stringJsonReader,
-            intReader,
-            booleanReader
-        )
-        val writer: JsonWriter<JavaRecordDto?> = cl.writer(
-            JavaRecordDto::class.java
-        )
-
-        val obj = JavaRecordDto("value1", 1, false)
-
-        val json = toJson(writer, obj)
-        val expectedJson = """
-            {
-              "field1" : "value1",
-              "integer" : 1
-            }""".trimIndent()
-        assertThat(json).isEqualTo(expectedJson)
-        val jsonForRead = """
-            {
-              "field1" : "value1",
-              "integer" : 1,
-              "bool" : false
-            }""".trimIndent()
-        val parsed = fromJson(reader, jsonForRead)
-        assertThat(parsed).isEqualTo(obj)
-
     }
 
     @Test

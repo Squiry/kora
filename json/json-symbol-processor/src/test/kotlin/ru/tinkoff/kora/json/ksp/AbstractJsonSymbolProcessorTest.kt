@@ -20,9 +20,7 @@ abstract class AbstractJsonSymbolProcessorTest : AbstractSymbolProcessorTest() {
 
     protected open fun compile(@Language("kotlin") vararg sources: String) {
         val compileResult = compile0(*sources)
-        if (compileResult.isFailed()) {
-            throw compileResult.compilationException()
-        }
+        compileResult.assertSuccess()
     }
 
     protected open fun readerClass(forClass: String) = compileResult.classLoader.readerClass(testPackage(), forClass)

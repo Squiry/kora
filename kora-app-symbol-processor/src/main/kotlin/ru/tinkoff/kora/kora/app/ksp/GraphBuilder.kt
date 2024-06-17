@@ -17,6 +17,7 @@ import ru.tinkoff.kora.kora.app.ksp.exception.CircularDependencyException
 import ru.tinkoff.kora.kora.app.ksp.exception.NewRoundException
 import ru.tinkoff.kora.kora.app.ksp.exception.UnresolvedDependencyException
 import ru.tinkoff.kora.kora.app.ksp.extension.ExtensionResult
+import ru.tinkoff.kora.kora.app.ksp.interceptor.ComponentInterceptors
 import ru.tinkoff.kora.ksp.common.CommonClassNames
 import ru.tinkoff.kora.ksp.common.KotlinPoetUtils.controlFlow
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
@@ -235,6 +236,7 @@ object GraphBuilder {
                     processing.resolvedComponents.size,
                     declaration,
                     declaration.type,
+                    declaration.type.toTypeName(),
                     declaration.tags,
                     listOf(),
                     resolvedDependencies
@@ -246,7 +248,15 @@ object GraphBuilder {
                 }
             }
         }
-        return ProcessingState.Ok(processing.root, processing.allModules, ArrayList(processing.resolvedComponents))
+        val components = ArrayList(processing.resolvedComponents)
+        val interceptors: ComponentInterceptors = ComponentInterceptors.parseInterceptors(ctx, components)
+        for (c in components) {
+            for (d in c.dependencies) {
+                d.lateInit(ctx, processing.resolvedComponents)
+            }
+            c.lateInit(interceptors)
+        }
+        return ProcessingState.Ok(processing.root, processing.allModules, components)
     }
 
 
@@ -308,7 +318,7 @@ object GraphBuilder {
 
         val typeTpr = claimTypeDeclaration.typeParameters.toTypeParameterResolver()
         val typeParameters = claimTypeDeclaration.typeParameters.map { it.toTypeVariableName(typeTpr) }
-        val typeName = if (typeParameters.isEmpty())  claimTypeDeclaration.toClassName() else claimTypeDeclaration.toClassName().parameterizedBy(typeParameters)
+        val typeName = if (typeParameters.isEmpty()) claimTypeDeclaration.toClassName() else claimTypeDeclaration.toClassName().parameterizedBy(typeParameters)
         val promiseType = CommonClassNames.promiseOf.parameterizedBy(WildcardTypeName.producerOf(typeName))
         val type = TypeSpec.classBuilder(resultClassName)
             .generated(GraphBuilder::class)
@@ -427,15 +437,17 @@ object GraphBuilder {
                 processing.resolvedComponents.size,
                 proxyComponentDeclaration,
                 dependencyClaim.type,
+                dependencyClaim.type.toTypeName(),
                 setOf(CommonClassNames.promisedProxy.canonicalName),
                 emptyList(),
                 listOf(
                     ComponentDependency.PromisedProxyParameterDependency(
-                        declaration, DependencyClaim(
-                        declaration.type,
-                        declaration.tags,
-                        ONE_REQUIRED
-                    )
+                        declaration,
+                        DependencyClaim(
+                            declaration.type,
+                            declaration.tags,
+                            ONE_REQUIRED
+                        )
                     )
                 )
             )
