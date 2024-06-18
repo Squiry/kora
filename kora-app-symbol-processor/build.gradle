@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 import java.nio.file.Files
 
 plugins {
@@ -18,6 +20,12 @@ dependencies {
 
     testImplementation testFixtures(project(':annotation-processor-common'))
     testImplementation testFixtures(project(':symbol-processor-common'))
+}
+
+kotlin {
+}
+tasks.withType(KotlinCompile).configureEach {
+    kotlinOptions.freeCompilerArgs += ["-XXLanguage:+BreakContinueInInlineLambdas"]
 }
 
 test {

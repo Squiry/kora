@@ -3,6 +3,8 @@ package ru.tinkoff.kora.database.symbol.processor.jdbc
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import ru.tinkoff.kora.common.Tag
+import ru.tinkoff.kora.database.symbol.processor.RepositorySymbolProcessorProvider
+import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 import ru.tinkoff.kora.ksp.common.GraphUtil.toGraphDraw
 
@@ -21,7 +23,7 @@ class JdbcExtensionTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun testRowMapper() {
-        val result = compile0(
+        val result = compile0(listOf(RepositorySymbolProcessorProvider(), KoraAppProcessorProvider()),
             """
             @KoraApp
             interface Application : JdbcDatabaseModule {

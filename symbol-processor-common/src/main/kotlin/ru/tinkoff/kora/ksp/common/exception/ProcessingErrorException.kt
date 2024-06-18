@@ -2,7 +2,6 @@ package ru.tinkoff.kora.ksp.common.exception
 
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSDeclaration
 import javax.tools.Diagnostic
 
 

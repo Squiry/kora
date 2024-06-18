@@ -9,7 +9,8 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
 import ru.tinkoff.kora.application.graph.TypeRef
-import ru.tinkoff.kora.kora.app.ksp.GraphResolutionHelper
+import ru.tinkoff.kora.kora.app.ksp.GraphResolutionHelper.findDependenciesForAllOf
+import ru.tinkoff.kora.kora.app.ksp.GraphResolutionHelper.findDependency
 import ru.tinkoff.kora.kora.app.ksp.ProcessingContext
 import ru.tinkoff.kora.kora.app.ksp.declaration.ComponentDeclaration
 import ru.tinkoff.kora.ksp.common.CommonClassNames
@@ -136,7 +137,7 @@ sealed interface ComponentDependency {
         }
 
         override fun lateInit(ctx: ProcessingContext, resolvedComponents: List<ResolvedComponent>) {
-            dependencies = GraphResolutionHelper.findDependenciesForAllOf(ctx, claim, resolvedComponents)
+            dependencies = ctx.findDependenciesForAllOf(claim, resolvedComponents)
         }
     }
 
@@ -144,7 +145,7 @@ sealed interface ComponentDependency {
         lateinit var dependency: SingleDependency
 
         override fun lateInit(ctx: ProcessingContext, resolvedComponents: List<ResolvedComponent>) {
-            dependency = GraphResolutionHelper.findDependency(ctx, declaration, resolvedComponents, this.claim)!!
+            dependency = ctx.findDependency(declaration, resolvedComponents, this.claim)!!
         }
 
         override fun write(): CodeBlock {

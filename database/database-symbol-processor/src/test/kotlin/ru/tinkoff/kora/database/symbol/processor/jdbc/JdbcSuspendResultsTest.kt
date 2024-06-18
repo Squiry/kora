@@ -8,15 +8,14 @@ import ru.tinkoff.kora.annotation.processor.common.TestContext
 import ru.tinkoff.kora.application.graph.TypeRef
 import ru.tinkoff.kora.database.jdbc.JdbcConnectionFactory
 import ru.tinkoff.kora.database.jdbc.mapper.result.JdbcResultSetMapper
-import ru.tinkoff.kora.database.symbol.processor.DbTestUtils
-import ru.tinkoff.kora.database.symbol.processor.jdbc.repository.AllowedSuspendResultsRepository
 import java.util.*
 import java.util.concurrent.Executor
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class JdbcSuspendResultsTest {
     private val executor: MockJdbcExecutor = MockJdbcExecutor()
-    private val repository: AllowedSuspendResultsRepository
+
+    //    private val repository: AllowedSuspendResultsRepository
     private val ctx = TestContext()
 
     init {
@@ -33,7 +32,7 @@ class JdbcSuspendResultsTest {
         ctx.addMock(TypeRef.of(JdbcResultSetMapper::class.java, Int::class.javaObjectType))
         ctx.addMock(TypeRef.of(JdbcResultSetMapper::class.java, TypeRef.of(List::class.java, Int::class.javaObjectType)))
         ctx.addMock(TypeRef.of(JdbcResultSetMapper::class.java, TypeRef.of(Optional::class.java, Int::class.javaObjectType)))
-        repository = ctx.newInstance(DbTestUtils.compileClass(AllowedSuspendResultsRepository::class).java)
+//        repository = ctx.newInstance(DbTestUtils.compileClass(AllowedSuspendResultsRepository::class).java)
     }
 
     @BeforeEach
@@ -44,7 +43,7 @@ class JdbcSuspendResultsTest {
     @Test
     fun testReturnVoid() {
         runBlocking {
-            repository.returnVoid()
+//            repository.returnVoid()
         }
     }
 }

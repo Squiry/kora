@@ -8,7 +8,7 @@ class AbstractClassTest : AbstractJdbcRepositoryTest() {
 
     @Test
     fun testAbstractClassRepository() {
-        compile0("""
+        compile0(listOf(RepositorySymbolProcessorProvider()), """
             @Repository
             abstract class AbstractClassRepository(private val field: String?) : JdbcRepository {
                 @Query("INSERT INTO table(value) VALUES (:value)")
@@ -23,7 +23,7 @@ class AbstractClassTest : AbstractJdbcRepositoryTest() {
 
     @Test
     fun testAbstractClassRepositoryExtension() {
-        compile0("""
+        compile0(listOf(RepositorySymbolProcessorProvider()), """
             @Repository
             abstract class AbstractClassRepository : JdbcRepository {
                 @Query("INSERT INTO table(value) VALUES (:value)")

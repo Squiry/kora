@@ -4,35 +4,33 @@ import com.google.devtools.ksp.isProtected
 import com.google.devtools.ksp.isPublic
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import com.squareup.kotlinpoet.*
-import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
-import com.squareup.kotlinpoet.ksp.toAnnotationSpec
-import com.squareup.kotlinpoet.ksp.toClassName
-import com.squareup.kotlinpoet.ksp.toTypeName
-import com.squareup.kotlinpoet.ksp.toTypeVariableName
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.ParameterSpec
+import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.ksp.*
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.isAnnotationPresent
 import ru.tinkoff.kora.ksp.common.CommonClassNames.aopAnnotation
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.resolveToUnderlying
 
 object CommonAopUtils {
     fun KSClassDeclaration.extendsKeepAop(newName: String): TypeSpec.Builder {
-        val type = this
         val b: TypeSpec.Builder = TypeSpec.classBuilder(newName)
-            .addOriginatingKSFile(type.containingFile!!)
-        if (type.classKind == ClassKind.INTERFACE) {
-            b.addSuperinterface(type.toClassName())
+            .addOriginatingKSFile(containingFile!!)
+        if (classKind == ClassKind.INTERFACE) {
+            b.addSuperinterface(toClassName())
         } else {
-            b.superclass(type.toClassName())
+            b.superclass(toClassName())
         }
 
-        if(hasAopAnnotations(type)) {
+        if (hasAopAnnotations()) {
             b.addModifiers(KModifier.OPEN)
         } else {
             b.addModifiers(KModifier.FINAL)
         }
 
-        for (annotationMirror in type.annotations) {
-            if (isAopAnnotation(annotationMirror)) {
+        for (annotationMirror in annotations) {
+            if (annotationMirror.isAopAnnotation()) {
                 b.addAnnotation(annotationMirror.toAnnotationSpec())
             }
         }
@@ -57,7 +55,7 @@ object CommonAopUtils {
         }
         funBuilder.addModifiers(KModifier.OVERRIDE)
         for (annotation in funDeclaration.annotations) {
-            if (isAopAnnotation(annotation)) {
+            if (annotation.isAopAnnotation()) {
                 funBuilder.addAnnotation(annotation.toAnnotationSpec())
             }
         }
@@ -73,7 +71,7 @@ object CommonAopUtils {
                 pb.addModifiers(KModifier.VARARG)
             }
             for (annotation in parameter.annotations) {
-                if (isAopAnnotation(annotation)) {
+                if (annotation.isAopAnnotation()) {
                     pb.addAnnotation(annotation.toAnnotationSpec())
                 }
             }
@@ -83,19 +81,19 @@ object CommonAopUtils {
         return funBuilder
     }
 
-    fun hasAopAnnotations(ksAnnotated: KSAnnotated): Boolean {
-        if (hasAopAnnotation(ksAnnotated)) {
+    fun KSAnnotated.hasAopAnnotations(): Boolean {
+        if (hasAopAnnotation()) {
             return true
         }
-        val methods = findMethods(ksAnnotated) { f ->
+        val methods = findMethods { f ->
             f.isPublic() || f.isProtected()
         }
         for (method in methods) {
-            if (hasAopAnnotation(method)) {
+            if (method.hasAopAnnotation()) {
                 return true
             }
             for (parameter in method.parameters) {
-                if (hasAopAnnotation(parameter)) {
+                if (parameter.hasAopAnnotation()) {
                     return true
                 }
             }
@@ -103,12 +101,11 @@ object CommonAopUtils {
         return false
     }
 
-    fun hasAopAnnotation(e: KSAnnotated): Boolean {
-        return e.annotations.any { isAopAnnotation(it) }
+    fun KSAnnotated.hasAopAnnotation(): Boolean {
+        return this.annotations.any { it.isAopAnnotation() }
     }
 
-    fun isAopAnnotation(annotation: KSAnnotation): Boolean {
-        return annotation.annotationType.resolveToUnderlying().declaration.isAnnotationPresent(aopAnnotation)
+    fun KSAnnotation.isAopAnnotation(): Boolean {
+        return this.annotationType.resolveToUnderlying().declaration.isAnnotationPresent(aopAnnotation)
     }
-
 }

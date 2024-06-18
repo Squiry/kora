@@ -35,11 +35,11 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
         var loomLogger = LoggerFactory.getLogger(VirtualThreadExecutorHolder.class);
         var status = VirtualThreadExecutorHolder.status();
         if (status == VirtualThreadExecutorHolder.VirtualThreadStatus.ENABLED) {
-            loomLogger.info("VirtualThreadExecutor enabled");
+            loomLogger.debug("VirtualThreadExecutor enabled");
         } else if (status == VirtualThreadExecutorHolder.VirtualThreadStatus.DISABLED) {
-            loomLogger.info("VirtualThreadExecutor disabled");
+            loomLogger.debug("VirtualThreadExecutor disabled");
         } else {
-            loomLogger.info("VirtualThreadExecutor unavailable");
+            loomLogger.debug("VirtualThreadExecutor unavailable");
         }
     }
 

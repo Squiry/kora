@@ -220,7 +220,7 @@ data class MappingData(val mapper: KSType?, val tags: Set<String>) {
 
 fun KSAnnotated.parseMappingData(): MappersData {
     val tags = TagUtils.parseTagValue(this)
-    val mappingsAnnotation = this.findAnnotation(Mapping.Mappings::class)
+    val mappingsAnnotation = this.findAnnotation(CommonClassNames.mappings)
     if (mappingsAnnotation != null) {
         val mappings = mappingsAnnotation.findValue<List<KSAnnotation>>("value")!!
         val mappers = mappings.map { it.findValue<KSType>("value")!! }
@@ -255,7 +255,10 @@ fun <T> KSAnnotated.visitFunctionArgument(visitor: (KSValueParameter) -> T) = th
 }, null)
 
 fun parseAnnotationClassValue(target: KSAnnotated, annotationName: String): List<KSType> {
-    val annotation = target.annotations.firstOrNull { it.annotationType.resolve().declaration.qualifiedName!!.asString() == annotationName }
+    val annotation = target.annotations.firstOrNull {
+        val name = it.annotationType.resolve().declaration.qualifiedName
+        name!!.asString() == annotationName
+    }
     val arguments = annotation?.arguments?: listOf()
     return arguments.asSequence()
         .filter { it.name!!.asString() == "value" }
@@ -277,12 +280,12 @@ fun parseTags(target: KSAnnotated): List<KSType> {
     return parseAnnotationClassValue(target, CommonClassNames.tag.canonicalName)
 }
 
-fun findMethods(ksAnnotated: KSAnnotated, functionFilter: (KSFunctionDeclaration) -> Boolean): List<KSFunctionDeclaration> {
-    if (ksAnnotated !is KSClassDeclaration) {
+fun KSAnnotated.findMethods(functionFilter: (KSFunctionDeclaration) -> Boolean): List<KSFunctionDeclaration> {
+    if (this !is KSClassDeclaration) {
         return emptyList()
     }
     val result = ArrayList<KSFunctionDeclaration>()
-    for (function in ksAnnotated.getDeclaredFunctions().toList()) {
+    for (function in this.getDeclaredFunctions().toList()) {
         if (!functionFilter(function)) {
             continue
         }

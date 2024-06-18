@@ -17,7 +17,6 @@ class JdbcMacrosTest : AbstractJdbcRepositoryTest() {
                 data class Entity(@field:Id val id: String, @field:Column("value1") val field1: Long, val value2: String, val value3: String?)
                         
                 @Query("SELECT * FROM %{return#table} WHERE id = :id")
-                @Nullable
                 fun findById(id: String): Entity?
             }
             

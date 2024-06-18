@@ -17,5 +17,5 @@ abstract class AbstractJdbcRepositoryTest : AbstractRepositoryTest() {
         """.trimIndent()
     }
 
-    protected fun compile(arguments: List<*>, @Language("kotlin") vararg sources: String) = compile(executor, arguments, *sources)
+    protected fun compile(arguments: List<Any>, @Language("kotlin") vararg sources: String) = compile(executor, arguments, *sources)
 }

@@ -129,20 +129,20 @@ sealed interface ComponentDeclaration {
             return FromModuleComponent(type, module, tags, method, parameterTypes, typeParameters)
         }
 
-        fun fromAnnotated(ctx: ProcessingContext, classDeclaration: KSClassDeclaration): AnnotatedComponent {
+        fun ProcessingContext.fromAnnotated(classDeclaration: KSClassDeclaration): AnnotatedComponent {
             val constructor = classDeclaration.primaryConstructor
             if (constructor == null) {
                 throw ProcessingErrorException("@Component annotated class should have primary constructor", classDeclaration)
             }
             val typeParameters = classDeclaration.typeParameters.map {
-                val t = it.bounds.firstOrNull()?.resolve() ?: ctx.resolver.builtIns.anyType
+                val t = it.bounds.firstOrNull()?.resolve() ?: resolver.builtIns.anyType
 
-                ctx.resolver.getTypeArgument(
-                    ctx.resolver.createKSTypeReferenceFromKSType(t),
+                resolver.getTypeArgument(
+                    resolver.createKSTypeReferenceFromKSType(t),
                     it.variance
                 )
             }
-            val type = classDeclaration.asType(classDeclaration.typeParameters.map { ctx.resolver.getTypeArgument(it.bounds.first(), it.variance) })
+            val type = classDeclaration.asType(classDeclaration.typeParameters.map { resolver.getTypeArgument(it.bounds.first(), it.variance) })
             val tags = TagUtils.parseTagValue(classDeclaration)
             val parameterTypes = constructor.parameters.map { it.type.resolve() }
 

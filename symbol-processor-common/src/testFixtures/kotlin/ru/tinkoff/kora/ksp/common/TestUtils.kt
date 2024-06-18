@@ -146,7 +146,7 @@ object TestUtils {
         k2JvmArgs.freeArgs = files.map { it.toString() }
         k2JvmArgs.classpath = AbstractSymbolProcessorTest.classpath.joinToString(File.pathSeparator);
 
-        val co = K2JVMCompiler();
+        val co = K2JVMCompiler()
 
         val sw = ByteArrayOutputStream();
         val collector = PrintingMessageCollector(

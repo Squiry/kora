@@ -82,7 +82,7 @@ class JdbcRepositoryGenerator(private val resolver: Resolver) : RepositoryGenera
         val connection = parameters.firstOrNull { it is QueryParameter.ConnectionParameter }
             ?.let { CodeBlock.of("%L", it.variable) } ?: CodeBlock.of("_jdbcConnectionFactory.currentConnection()")
         b.addStatement("var _conToUse = %L", connection)
-        b.addStatement("val _conToClose: %T?", JdbcTypes.connection)
+        b.addStatement("var _conToClose: %T? = null", JdbcTypes.connection)
         b.controlFlow("if (_conToUse == null)") {
             addStatement("_conToUse = _jdbcConnectionFactory.newConnection()")
             addStatement("_conToClose = _conToUse")

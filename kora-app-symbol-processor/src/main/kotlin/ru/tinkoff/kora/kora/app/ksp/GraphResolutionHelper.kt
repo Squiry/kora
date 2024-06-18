@@ -13,8 +13,8 @@ import ru.tinkoff.kora.ksp.common.TagUtils
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
 
 object GraphResolutionHelper {
-    fun findDependency(ctx: ProcessingContext, forDeclaration: ComponentDeclaration, resolvedComponents: List<ResolvedComponent>, dependencyClaim: DependencyClaim): SingleDependency? {
-        val dependencies = findDependencies(ctx, resolvedComponents, dependencyClaim)
+    fun ProcessingContext.findDependency(forDeclaration: ComponentDeclaration, resolvedComponents: List<ResolvedComponent>, dependencyClaim: DependencyClaim): SingleDependency? {
+        val dependencies = this.findDependencies(resolvedComponents, dependencyClaim)
         if (dependencies.size == 1) {
             return dependencies[0]
         }
@@ -28,14 +28,14 @@ object GraphResolutionHelper {
         )
     }
 
-    fun findDependencies(ctx: ProcessingContext, resolvedComponents: List<ResolvedComponent>, dependencyClaim: DependencyClaim): List<SingleDependency> {
+    fun ProcessingContext.findDependencies(resolvedComponents: List<ResolvedComponent>, dependencyClaim: DependencyClaim): List<SingleDependency> {
         val result = ArrayList<SingleDependency>(4)
         for (resolvedComponent in resolvedComponents) {
             if (!dependencyClaim.tagsMatches(resolvedComponent.tags)) {
                 continue
             }
             val isDirectAssignable = dependencyClaim.type.isAssignableFrom(resolvedComponent.type)
-            val isWrappedAssignable = ctx.serviceTypesHelper.isAssignableToUnwrapped(resolvedComponent.type, dependencyClaim.type)
+            val isWrappedAssignable = serviceTypesHelper.isAssignableToUnwrapped(resolvedComponent.type, dependencyClaim.type)
             if (!isDirectAssignable && !isWrappedAssignable) {
                 continue
             }
@@ -53,7 +53,7 @@ object GraphResolutionHelper {
         return result
     }
 
-    fun findFinalDependency(ctx: ProcessingContext, dependencyClaim: DependencyClaim): ComponentDeclaration? {
+    fun ProcessingContext.findFinalDependency(dependencyClaim: DependencyClaim): ComponentDeclaration? {
         val declaration = dependencyClaim.type.declaration
         if (declaration !is KSClassDeclaration) {
             return null
@@ -72,12 +72,12 @@ object GraphResolutionHelper {
         }
         val tags = TagUtils.parseTagValue(declaration)
         if (dependencyClaim.tagsMatches(tags)) {
-            return ComponentDeclaration.fromDependency(ctx, declaration)
+            return ComponentDeclaration.fromDependency(this, declaration)
         }
         return null
     }
 
-    fun findDependenciesForAllOf(ctx: ProcessingContext, dependencyClaim: DependencyClaim, resolvedComponents: List<ResolvedComponent>): List<SingleDependency> {
+    fun ProcessingContext.findDependenciesForAllOf(dependencyClaim: DependencyClaim, resolvedComponents: List<ResolvedComponent>): List<SingleDependency> {
         val result = mutableListOf<SingleDependency>()
         for (component in resolvedComponents) {
             if (!dependencyClaim.tagsMatches(component.tags)) {
@@ -93,7 +93,7 @@ object GraphResolutionHelper {
                 }
                 result.add(dependency)
             }
-            if (ctx.serviceTypesHelper.isAssignableToUnwrapped(component.type, dependencyClaim.type)) {
+            if (serviceTypesHelper.isAssignableToUnwrapped(component.type, dependencyClaim.type)) {
                 val targetDependency = WrappedTargetDependency(dependencyClaim, component)
                 val dependency = when (dependencyClaim.claimType) {
                     DependencyClaim.DependencyClaimType.ALL -> targetDependency
@@ -108,13 +108,12 @@ object GraphResolutionHelper {
     }
 
 
-    fun findDependencyDeclarationFromTemplate(
-        ctx: ProcessingContext,
+    fun ProcessingContext.findDependencyDeclarationFromTemplate(
         forDeclaration: ComponentDeclaration,
         templateDeclarations: List<ComponentDeclaration>,
         dependencyClaim: DependencyClaim
     ): ComponentDeclaration? {
-        val result = findDependencyDeclarationsFromTemplate(ctx, forDeclaration, templateDeclarations, dependencyClaim)
+        val result = this.findDependencyDeclarationsFromTemplate(forDeclaration, templateDeclarations, dependencyClaim)
         if (result.isEmpty()) {
             return null
         }
@@ -130,8 +129,7 @@ object GraphResolutionHelper {
     }
 
 
-    fun findDependencyDeclarationsFromTemplate(
-        ctx: ProcessingContext,
+    fun ProcessingContext.findDependencyDeclarationsFromTemplate(
         @Suppress("UNUSED_PARAMETER")
         forDeclaration: ComponentDeclaration,
         templateDeclarations: List<ComponentDeclaration>,
@@ -144,23 +142,23 @@ object GraphResolutionHelper {
             }
             when (template) {
                 is ComponentDeclaration.FromModuleComponent -> {
-                    val match = ComponentTemplateHelper.match(ctx, template.method.typeParameters, template.type, dependencyClaim.type)
+                    val match = ComponentTemplateHelper.match(this, template.method.typeParameters, template.type, dependencyClaim.type)
                     if (match !is ComponentTemplateHelper.TemplateMatch.Some) {
                         continue
                     }
                     val map = match.map
-                    val realReturnType = ComponentTemplateHelper.replace(ctx.resolver, template.type, map)!!
+                    val realReturnType = ComponentTemplateHelper.replace(resolver, template.type, map)!!
                     if (!dependencyClaim.type.isAssignableFrom(realReturnType)) {
                         continue
                     }
 
                     val realParams = mutableListOf<KSType>()
                     for (methodParameterType in template.methodParameterTypes) {
-                        realParams.add(ComponentTemplateHelper.replace(ctx.resolver, methodParameterType, map)!!)
+                        realParams.add(ComponentTemplateHelper.replace(resolver, methodParameterType, map)!!)
                     }
                     val realTypeParameters = mutableListOf<KSTypeArgument>()
                     for (typeParameter in template.method.typeParameters) {
-                        realTypeParameters.add(ComponentTemplateHelper.replace(ctx.resolver, typeParameter, map)!!)
+                        realTypeParameters.add(ComponentTemplateHelper.replace(resolver, typeParameter, map)!!)
                     }
                     result.add(
                         ComponentDeclaration.FromModuleComponent(
@@ -175,23 +173,23 @@ object GraphResolutionHelper {
                 }
 
                 is ComponentDeclaration.AnnotatedComponent -> {
-                    val match = ComponentTemplateHelper.match(ctx, template.classDeclaration.typeParameters, template.type, dependencyClaim.type)
+                    val match = ComponentTemplateHelper.match(this, template.classDeclaration.typeParameters, template.type, dependencyClaim.type)
                     if (match !is ComponentTemplateHelper.TemplateMatch.Some) {
                         continue
                     }
                     val map = match.map
-                    val realReturnType = ComponentTemplateHelper.replace(ctx.resolver, template.type, map)!!
+                    val realReturnType = ComponentTemplateHelper.replace(resolver, template.type, map)!!
                     if (!dependencyClaim.type.isAssignableFrom(realReturnType)) {
                         continue
                     }
 
                     val realParams = mutableListOf<KSType>()
                     for (methodParameterType in template.methodParameterTypes) {
-                        realParams.add(ComponentTemplateHelper.replace(ctx.resolver, methodParameterType, map)!!)
+                        realParams.add(ComponentTemplateHelper.replace(resolver, methodParameterType, map)!!)
                     }
                     val realTypeParameters = mutableListOf<KSTypeArgument>()
                     for (typeParameter in template.classDeclaration.typeParameters) {
-                        realTypeParameters.add(ComponentTemplateHelper.replace(ctx.resolver, typeParameter, map)!!)
+                        realTypeParameters.add(ComponentTemplateHelper.replace(resolver, typeParameter, map)!!)
                     }
                     result.add(
                         ComponentDeclaration.AnnotatedComponent(
@@ -206,12 +204,12 @@ object GraphResolutionHelper {
                 }
 
                 is ComponentDeclaration.PromisedProxyComponent -> {
-                    val match = ComponentTemplateHelper.match(ctx, template.classDeclaration.typeParameters, template.type, dependencyClaim.type)
+                    val match = ComponentTemplateHelper.match(this, template.classDeclaration.typeParameters, template.type, dependencyClaim.type)
                     if (match !is ComponentTemplateHelper.TemplateMatch.Some) {
                         continue
                     }
                     val map = match.map
-                    val realReturnType = ComponentTemplateHelper.replace(ctx.resolver, template.type, map)!!
+                    val realReturnType = ComponentTemplateHelper.replace(resolver, template.type, map)!!
                     if (!dependencyClaim.type.isAssignableFrom(realReturnType)) {
                         continue
                     }
@@ -226,19 +224,19 @@ object GraphResolutionHelper {
                     }
 
                     val classDeclaration = sourceMethod.returnType!!.resolve().declaration
-                    val match = ComponentTemplateHelper.match(ctx, classDeclaration.typeParameters, template.type, dependencyClaim.type)
+                    val match = ComponentTemplateHelper.match(this, classDeclaration.typeParameters, template.type, dependencyClaim.type)
                     if (match !is ComponentTemplateHelper.TemplateMatch.Some) {
                         continue
                     }
                     val map = match.map
-                    val realReturnType = ComponentTemplateHelper.replace(ctx.resolver, template.type, map)!!
+                    val realReturnType = ComponentTemplateHelper.replace(resolver, template.type, map)!!
                     if (!dependencyClaim.type.isAssignableFrom(realReturnType)) {
                         continue
                     }
 
                     val realParams = mutableListOf<KSType>()
                     for (methodParameterType in template.methodParameterTypes) {
-                        realParams.add(ComponentTemplateHelper.replace(ctx.resolver, methodParameterType, map)!!)
+                        realParams.add(ComponentTemplateHelper.replace(resolver, methodParameterType, map)!!)
                     }
                     result.add(ComponentDeclaration.FromExtensionComponent(
                         realReturnType,
@@ -272,15 +270,14 @@ object GraphResolutionHelper {
     }
 
 
-    fun findDependencyDeclaration(
-        ctx: ProcessingContext,
+    fun ProcessingContext.findDependencyDeclaration(
         forDeclaration: ComponentDeclaration,
         sourceDeclarations: List<ComponentDeclaration>,
         dependencyClaim: DependencyClaim
     ): ComponentDeclaration? {
         val claimType = dependencyClaim.claimType
         assert(claimType !in listOf(DependencyClaim.DependencyClaimType.ALL, DependencyClaim.DependencyClaimType.ALL_OF_PROMISE, DependencyClaim.DependencyClaimType.ALL_OF_VALUE))
-        val declarations = findDependencyDeclarations(ctx, sourceDeclarations, dependencyClaim)
+        val declarations = this.findDependencyDeclarations(sourceDeclarations, dependencyClaim)
         if (declarations.size == 1) {
             return declarations[0]
         }
@@ -293,7 +290,7 @@ object GraphResolutionHelper {
         }
 
         val exactMatch = declarations.asSequence()
-            .filter { it.type == dependencyClaim.type || ctx.serviceTypesHelper.isSameToUnwrapped(it.type, dependencyClaim.type) }
+            .filter { it.type == dependencyClaim.type || serviceTypesHelper.isSameToUnwrapped(it.type, dependencyClaim.type) }
             .toList()
         if (exactMatch.size == 1) {
             return exactMatch[0]
@@ -306,23 +303,23 @@ object GraphResolutionHelper {
         )
     }
 
-    fun findDependencyDeclarations(ctx: ProcessingContext, sourceDeclarations: List<ComponentDeclaration>, dependencyClaim: DependencyClaim): List<ComponentDeclaration> {
+    fun ProcessingContext.findDependencyDeclarations(sourceDeclarations: List<ComponentDeclaration>, dependencyClaim: DependencyClaim): List<ComponentDeclaration> {
         val result = mutableListOf<ComponentDeclaration>()
         for (sourceDeclaration in sourceDeclarations) {
             if (!dependencyClaim.tagsMatches(sourceDeclaration.tags)) {
                 continue
             }
-            if (dependencyClaim.type.isAssignableFrom(sourceDeclaration.type) || ctx.serviceTypesHelper.isAssignableToUnwrapped(sourceDeclaration.type, dependencyClaim.type)) {
+            if (dependencyClaim.type.isAssignableFrom(sourceDeclaration.type) || serviceTypesHelper.isAssignableToUnwrapped(sourceDeclaration.type, dependencyClaim.type)) {
                 result.add(sourceDeclaration)
             }
         }
         return result
     }
 
-    fun findInterceptorDeclarations(ctx: ProcessingContext, sourceDeclarations: List<ComponentDeclaration>, type: KSType): MutableList<ComponentDeclaration> {
+    fun ProcessingContext.findInterceptorDeclarations(sourceDeclarations: List<ComponentDeclaration>, type: KSType): MutableList<ComponentDeclaration> {
         val result = mutableListOf<ComponentDeclaration>()
         for (sourceDeclaration in sourceDeclarations) {
-            if (ctx.serviceTypesHelper.isInterceptorFor(sourceDeclaration.type, type)) {
+            if (serviceTypesHelper.isInterceptorFor(sourceDeclaration.type, type)) {
                 result.add(sourceDeclaration)
             }
         }

@@ -117,7 +117,7 @@ class AopProcessor(private val aspects: List<KoraAspect>, private val resolver: 
             typeBuilder.addAnnotation(CommonClassNames.root)
         }
 
-        val classFunctions = findMethods(classDeclaration) { f ->
+        val classFunctions = classDeclaration.findMethods { f ->
             !f.isConstructor() && (f.isPublic() || f.isProtected())
         }
 
