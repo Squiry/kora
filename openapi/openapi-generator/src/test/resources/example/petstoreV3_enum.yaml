@@ -40,77 +40,84 @@ components:
         id:
           type: integer
           format: int64
-        nullableType:
-          type: string
-          enum: [ Dingo ]
-          nullable: true
-        nonReqType:
-          type: string
-          enum: [ Husky ]
-        reqType:
-          type: string
-          enum: [ Retriever ]
-        reqAndNotNullType:
-          type: string
-          enum: [ Shepherd ]
-          nullable: false
-        nonReqString:
-          type: string
-          enum: [ Dingo-Don, Husky, Retriever, Shepherd ]
-        nullableArrayString:
-          type: array
-          nullable: true
-          items:
-            type: string
-            enum:
-              - Dingo-Don
-              - Husky
-              - Retriever
-              - Shepherd
-        nonReqArrayString:
-          type: array
-          items:
-            type: string
-            enum:
-              - Dingo-Don
-              - Husky
-              - Retriever
-              - Shepherd
-        reqArrayString:
-          type: array
-          items:
-            type: string
-            enum:
-              - Dingo-Don
-              - Husky
-              - Retriever
-              - Shepherd
-        reqAndNotNullArrayString:
-          type: array
-          nullable: false
-          items:
-            type: string
-            enum:
-              - Dingo-Don
-              - Husky
-              - Retriever
-              - Shepherd
-        nonReqInt:
-          type: int
-          enum: [ 5, 7, 8, 10 ]
-        nonReqArrayInt:
-          type: array
-          items:
-            type: int
-            enum:
-              - 5
-              - 7
-              - 8
-              - 10
+        #        nullableType:
+        #          type: string
+        #          enum: [ Dingo ]
+        #          nullable: true
+        #        nonReqType:
+        #          type: string
+        #          enum: [ Husky ]
+        #        reqType:
+        #          type: string
+        #          enum: [ Retriever ]
+        #        reqAndNotNullType:
+        #          type: string
+        #          enum: [ Shepherd ]
+        #          nullable: false
+        #        nonReqString:
+        #          type: string
+        #          enum: [ Dingo-Don, Husky, Retriever, Shepherd ]
+        #        nullableArrayString:
+        #          type: array
+        #          nullable: true
+        #          items:
+        #            type: string
+        #            enum:
+        #              - Dingo-Don
+        #              - Husky
+        #              - Retriever
+        #              - Shepherd
+        #        nonReqArrayString:
+        #          type: array
+        #          items:
+        #            type: string
+        #            enum:
+        #              - Dingo-Don
+        #              - Husky
+        #              - Retriever
+        #              - Shepherd
+        #        reqArrayString:
+        #          type: array
+        #          items:
+        #            type: string
+        #            enum:
+        #              - Dingo-Don
+        #              - Husky
+        #              - Retriever
+        #              - Shepherd
+        #        reqAndNotNullArrayString:
+        #          type: array
+        #          nullable: false
+        #          items:
+        #            type: string
+        #            enum:
+        #              - Dingo-Don
+        #              - Husky
+        #              - Retriever
+        #              - Shepherd
+        #        nonReqInt:
+        #          type: int
+        #          enum: [ 5, 7, 8, 10 ]
+        #        nonReqArrayInt:
+        #          type: array
+        #          items:
+        #            type: int
+        #            enum:
+        #              - 5
+        #              - 7
+        #              - 8
+        #              - 10
+        external:
+          $ref: "#/components/schemas/ExternalEnum"
     Pets:
       type: array
       items:
         $ref: "#/components/schemas/Pet"
+    ExternalEnum:
+      type: string
+      enum:
+        - ENUM_VAL_1
+        - ENUM_VAL_2
     Error:
       type: object
       required:

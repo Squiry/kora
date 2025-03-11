@@ -22,9 +22,7 @@ dependencies {
     implementation libs.commons.codec
     implementation libs.commons.io
     implementation libs.javapoet
-    implementation(libs.goethe) {
-        exclude group: 'com.squareup', module: 'javapoet'
-    }
+    implementation libs.kotlinpoet
 
     testImplementation(project(":json:json-common"))
     testImplementation(project(":json:jackson-module"))

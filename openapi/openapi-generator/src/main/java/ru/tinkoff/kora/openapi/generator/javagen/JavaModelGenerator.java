@@ -11,9 +11,8 @@ import ru.tinkoff.kora.openapi.generator.KoraCodegen;
 
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.regex.Pattern;
 
 public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
     private final String modelPackage;
@@ -46,7 +45,7 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
                 .build());
 
         for (var additionalModelTypeAnnotation : this.additionalModelTypeAnnotations) {
-            b.addAnnotation(ClassName.bestGuess(additionalModelTypeAnnotation));// TODO parse params
+            b.addAnnotation(parseAnnotation(additionalModelTypeAnnotation));// TODO parse params
         }
         b.addAnnotation(JavaClassNames.JSON_WRITER_ANNOTATION);
         var discriminatorValue = (List<String>) model.getVendorExtensions().get("x-discriminator-value");
@@ -60,33 +59,45 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
         if (this.params.enableValidation()) {
             b.addAnnotation(JavaClassNames.VALID_ANNOTATION);
         }
-        var primaryConstructor = MethodSpec.constructorBuilder()
+        var recordConstructor = MethodSpec.constructorBuilder()
+            .addModifiers(Modifier.PUBLIC);
+        var compactConstructor = MethodSpec.compactConstructorBuilder()
             .addModifiers(Modifier.PUBLIC)
             .addAnnotation(JavaClassNames.JSON_READER_ANNOTATION);
+        var requiredOnlyConstructor = MethodSpec.constructorBuilder()
+            .addModifiers(Modifier.PUBLIC)
+            .addCode("this(");
 
         var witherCode = CodeBlock.of("return new $T$L;\n", ClassName.get(this.modelPackage, model.classname), model.allVars.stream().map(s -> CodeBlock.of("$N", s.name)).collect(CodeBlock.joining(", ", "(", ")")));
-        for (var allVar : model.allVars) {
+        for (int i = 0; i < model.allVars.size(); i++) {
+            if (i > 0) {
+                requiredOnlyConstructor.addCode(", ");
+            }
+            var allVar = model.allVars.get(i);
             if (allVar.isEnum) {
-
                 var enumType = allVar.isArray
                     ? this.generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.mostInnerItems.dataType, (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars"))
                     : this.generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.dataType, (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars"));
                 b.addType(enumType);
             }
-
-//@ru.tinkoff.kora.json.common.annotation.JsonField("{{baseName}}"){{#vendorExtensions.x-json-include-always}}
-//@ru.tinkoff.kora.json.common.annotation.JsonInclude(ru.tinkoff.kora.json.common.annotation.JsonInclude.IncludeType.ALWAYS){{/vendorExtensions.x-json-include-always}}
-//  {{#vendorExtensions.x-has-min-max}}@ru.tinkoff.kora.validation.common.annotation.Range(from = {{minimum}}, to = {{maximum}}, boundary = ru.tinkoff.kora.validation.common.annotation.Range.Boundary.{{#exclusiveMinimum}}EXCLUSIVE{{/exclusiveMinimum}}{{^exclusiveMinimum}}INCLUSIVE{{/exclusiveMinimum}}_{{#exclusiveMaximum}}EXCLUSIVE{{/exclusiveMaximum}}{{^exclusiveMaximum}}INCLUSIVE{{/exclusiveMaximum}})
-//    {{/vendorExtensions.x-has-min-max}}{{#vendorExtensions.x-has-min-max-items}}@ru.tinkoff.kora.validation.common.annotation.Size(min = {{minItems}}, max = {{maxItems}})
-//{{/vendorExtensions.x-has-min-max-items}}{{#vendorExtensions.x-has-min-max-length}}@ru.tinkoff.kora.validation.common.annotation.Size(min = {{minLength}}, max = {{maxLength}})
-//{{/vendorExtensions.x-has-min-max-length}}{{#vendorExtensions.x-has-pattern}}@ru.tinkoff.kora.validation.common.annotation.Pattern("{{{pattern}}}")
-//{{/vendorExtensions.x-has-pattern}}{{#vendorExtensions.x-has-valid-model}}@ru.tinkoff.kora.validation.common.annotation.Valid
-//{{/vendorExtensions.x-has-valid-model}}{{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}}{{^-last}},{{/-last}}
-//    {{/allVars}})
-//
             var propertyTypeName = toTypeName(modelClassName, allVar);
+            if (allVar.isDiscriminator) {
+                var propertyEnumType = propertyTypeName;
+                var enumVars = (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars");
+                var enumConstants = enumVars.stream().map(v -> v.get("name")).toList();
+                var check = enumConstants.stream()
+                    .map(v -> CodeBlock.of("$N != $T.$N", allVar.name, propertyEnumType, v))
+                    .collect(CodeBlock.joining(" && "));
+                ;
+                compactConstructor.beginControlFlow("if ($L)", check)
+                    .addStatement("throw new IllegalArgumentException(\"Field $N should have one of the following values: $L; got \" + $N)", allVar.name, String.join(", ", enumConstants), allVar.name)
+                    .endControlFlow();
+            }
             if (allVar.isArray) {
                 propertyTypeName = ParameterizedTypeName.get(CommonClassNames.list, propertyTypeName);
+            }
+            if (this.params.enableJsonNullable() && allVar.isNullable) {
+                propertyTypeName = ParameterizedTypeName.get(JavaClassNames.JSON_NULLABLE, propertyTypeName);
             }
             var property = ParameterSpec.builder(propertyTypeName, allVar.name)
                 .addAnnotation(AnnotationSpec.builder(JavaClassNames.JSON_FIELD_ANNOTATION).addMember("value", "$S", allVar.baseName).build());
@@ -95,19 +106,54 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
             }
             if (this.params.enableValidation()) {
                 if (allVar.getMinimum() != null || allVar.getMaximum() != null) {
-//  {{#vendorExtensions.x-has-min-max}}@ru.tinkoff.kora.validation.common.annotation.Range(from = {{minimum}}, to = {{maximum}}, boundary = ru.tinkoff.kora.validation.common.annotation.Range.Boundary.{{#exclusiveMinimum}}EXCLUSIVE{{/exclusiveMinimum}}{{^exclusiveMinimum}}INCLUSIVE{{/exclusiveMinimum}}_{{#exclusiveMaximum}}EXCLUSIVE{{/exclusiveMaximum}}{{^exclusiveMaximum}}INCLUSIVE{{/exclusiveMaximum}})
+                    var boundary = (allVar.exclusiveMinimum ? "EXCLUSIVE" : "INCLUSIVE") + "_" + (allVar.exclusiveMaximum ? "EXCLUSIVE" : "INCLUSIVE");
                     property.addAnnotation(AnnotationSpec.builder(JavaClassNames.RANGE_ANNOTATION)
                         .addMember("from", "$L", allVar.getMinimum())
                         .addMember("to", "$L", allVar.getMaximum())
+                        .addMember("boundary", "$T.Boundary.$L", JavaClassNames.RANGE_ANNOTATION, boundary)
                         .build()
                     );
+                } else if (allVar.getMaxItems() != null) {
+                    assert allVar.getMinItems() != null;
+                    property.addAnnotation(AnnotationSpec.builder(JavaClassNames.SIZE_ANNOTATION)
+                        .addMember("min", "$L", allVar.getMinItems())
+                        .addMember("max", "$L", allVar.getMaxItems())
+                        .build());
+                } else if (allVar.getMinLength() != null) {
+                    assert allVar.getMaxLength() != null;
+                    property.addAnnotation(AnnotationSpec.builder(JavaClassNames.SIZE_ANNOTATION)
+                        .addMember("min", "$L", allVar.getMinLength())
+                        .addMember("max", "$L", allVar.getMaxLength())
+                        .build());
+                } else if (allVar.getPattern() != null) {
+                    property.addAnnotation(AnnotationSpec.builder(JavaClassNames.PATTERN_ANNOTATION)
+                        .addMember("value", "$S", allVar.getPattern())
+                        .build()
+                    );
+                } else if (allVar.getRef() != null) {
+                    property.addAnnotation(JavaClassNames.VALID_ANNOTATION);
                 }
-//                {{#vendorExtensions.x-has-min-max-items}}@ru.tinkoff.kora.validation.common.annotation.Size(min = {{minItems}}, max = {{maxItems}}){{/vendorExtensions.x-has-min-max-items}}
-//                {{#vendorExtensions.x-has-min-max-length}}@ru.tinkoff.kora.validation.common.annotation.Size(min = {{minLength}}, max = {{maxLength}}){/vendorExtensions.x-has-min-max-length}}
-//                {{#vendorExtensions.x-has-pattern}}@ru.tinkoff.kora.validation.common.annotation.Pattern("{{{pattern}}}"){/vendorExtensions.x-has-pattern}}
-//                {{#vendorExtensions.x-has-valid-model}}@ru.tinkoff.kora.validation.common.annotation.Valid{{/vendorExtensions.x-has-valid-model}}
             }
-            if (!allVar.required) {
+            var isSingleDiscriminator = allVar.isDiscriminator && ((List<Map<String, String>>) allVar.getAllowableValues().get("enumVars")).size() == 1;
+            if (allVar.required) {
+                if (!propertyTypeName.isPrimitive()) {
+                    compactConstructor.addStatement("$T.requireNonNull($N, $S)", Objects.class, allVar.name, "Field %s is not nullable".formatted(allVar.name));
+                }
+                if (isSingleDiscriminator) {
+                    var enumConstantName = ((List<Map<String, String>>) allVar.getAllowableValues().get("enumVars")).get(0).get("name");
+                    requiredOnlyConstructor.addCode("$T.$N", propertyTypeName, enumConstantName);
+                } else {
+                    requiredOnlyConstructor.addParameter(propertyTypeName, allVar.name);
+                    requiredOnlyConstructor.addCode("$N", allVar.name);
+                }
+            } else if (allVar.isNullable) {
+                if (params.enableJsonNullable()) {
+                    requiredOnlyConstructor.addCode("$T.undefined()", JavaClassNames.JSON_NULLABLE);
+                } else {
+                    requiredOnlyConstructor.addCode("null");
+                }
+            } else {
+                requiredOnlyConstructor.addCode("null");
                 property.addAnnotation(CommonClassNames.nullable);
             }
             if (allVar.description != null) {
@@ -117,26 +163,54 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
                 property.addAnnotation(Deprecated.class);
             }
             var finalProperty = property.build();
-            primaryConstructor.addParameter(finalProperty);
+            recordConstructor.addParameter(finalProperty);
 
             var witherParam = ParameterSpec.builder(finalProperty.type(), finalProperty.name());
             if (!allVar.required) {
                 witherParam.addAnnotation(CommonClassNames.nullable);
             }
-            var wither = MethodSpec.methodBuilder("with" + CommonUtils.capitalize(allVar.name))
-                .addModifiers(Modifier.PUBLIC)
-                .returns(modelClassName)
-                .addParameter(witherParam.build())
-                .addCode(witherCode);
-            b.addMethod(wither.build());
+            if (!isSingleDiscriminator) {
+                var wither = MethodSpec.methodBuilder("with" + CommonUtils.capitalize(allVar.name))
+                    .addModifiers(Modifier.PUBLIC)
+                    .returns(modelClassName)
+                    .addParameter(witherParam.build())
+                    .addCode(witherCode);
+                if (Objects.equals(allVar.isOverridden, Boolean.TRUE) && !allVar.isDiscriminator) {
+                    wither.addAnnotation(Override.class);
+                }
+                b.addMethod(wither.build());
+            }
         }
 
-        b.recordConstructor(primaryConstructor.build());
+        b.recordConstructor(recordConstructor.build());
+        b.addMethod(compactConstructor.build());
+        var requireOnlyFinal = requiredOnlyConstructor.addCode(");\n").build();
+        if (requireOnlyFinal.parameters().size() != model.allVars.size()) {
+            b.addMethod(requireOnlyFinal);
+        }
 
         return JavaFile.builder(modelPackage, b.build()).build();
     }
 
-    private JavaFile generateSealedInterface(CodegenModel model) {
+    private AnnotationSpec parseAnnotation(String additionalModelTypeAnnotation) {
+        additionalModelTypeAnnotation = additionalModelTypeAnnotation.trim();
+        if (!additionalModelTypeAnnotation.endsWith(")")) {
+            return AnnotationSpec.builder(ClassName.bestGuess(additionalModelTypeAnnotation)).build();
+        }
+        var pattern = Pattern.compile("@(?<fullClassName>.*)\\((?<args>.*)\\)");
+        var matcher = pattern.matcher(additionalModelTypeAnnotation);
+        if (matcher.find()) {
+            var fullClassName = Objects.requireNonNull(matcher.group("fullClassName"));
+            var args = Objects.requireNonNull(matcher.group("args"));
+            return AnnotationSpec.builder(ClassName.bestGuess(fullClassName)).addMember("value", "$L", args).build();
+        }
+        throw new RuntimeException("Cant parse annotation " + additionalModelTypeAnnotation);
+    }
+
+    public JavaFile generateSealedInterface(CodegenModel model) {
+        if (model.discriminator == null) {
+            throw new IllegalArgumentException();
+        }
         var modelName = ClassName.get(this.modelPackage, model.classname);
         var b = TypeSpec.interfaceBuilder(modelName)
             .addModifiers(Modifier.PUBLIC, Modifier.SEALED)
@@ -155,16 +229,12 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
         if (discriminatorProperty.getDescription() != null) {
             discriminator.addJavadoc("$N $L", model.discriminator.getPropertyBaseName(), discriminatorProperty.getDescription());
         }
-        if (discriminatorProperty.isArray) {
-            var property = discriminatorProperty.mostInnerItems;
-            var enumType = this.generateEnum(modelName, property.datatypeWithEnum, property.dataType, (List<Map<String, String>>) property.getAllowableValues().get("enumVars"));
-            b.addType(enumType);
-        } else {
-            var enumType = this.generateEnum(modelName, discriminatorProperty.datatypeWithEnum, discriminatorProperty.dataType, (List<Map<String, String>>) discriminatorProperty.getAllowableValues().get("enumVars"));
-            b.addType(enumType);
-        }
+        var discriminatorEnumType = this.generateEnum(modelName, discriminatorProperty.datatypeWithEnum, discriminatorProperty.dataType, (List<Map<String, String>>) discriminatorProperty.getAllowableValues().get("enumVars"));
+        b.addType(discriminatorEnumType);
+
         b.addMethod(discriminator.build());
 
+        var withers = new ArrayList<MethodSpec>();
         for (var allVar : model.getAllVars()) {
             if (allVar.isDiscriminator) {
                 continue;
@@ -185,26 +255,37 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
             if (allVar.getDescription() != null) {
                 property.addJavadoc(allVar.description);
             }
-            if (this.params.enableValidation()) {
+            if (this.params.enableJsonNullable()) {
                 if (allVar.isNullable) {
-                    property.addAnnotation(CommonClassNames.nullable);
+                    property.returns(ParameterizedTypeName.get(JavaClassNames.JSON_NULLABLE, propertyType));
+                } else {
+                    if (!allVar.required) {
+                        property.addAnnotation(CommonClassNames.nullable);
+                    }
+                    property.returns(propertyType);
                 }
-                property.returns(ParameterizedTypeName.get(JavaClassNames.JSON_NULLABLE, propertyType));
             } else {
                 if (!allVar.required) {
                     property.addAnnotation(CommonClassNames.nullable);
                 }
                 property.returns(propertyType);
             }
-            b.addMethod(property.build());
+            var propertyMethod = property.build();
+            b.addMethod(propertyMethod);
+
+            var witherParam = ParameterSpec.builder(propertyMethod.returnType(), allVar.name);
+            if (!allVar.required) {
+                witherParam.addAnnotation(CommonClassNames.nullable);
+            }
 
             var wither = MethodSpec.methodBuilder("with" + CommonUtils.capitalize(allVar.name))
                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                .addParameter(propertyType, allVar.name)
+                .addParameter(witherParam.build())
                 .returns(modelName)
                 .build();
-            b.addMethod(wither);
+            withers.add(wither);
         }
+        withers.forEach(b::addMethod);
 
         return JavaFile.builder(modelPackage, b.build()).build();
     }
@@ -238,16 +319,15 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
         }
         b.addType(constants.build());
 
-        var enumJsonWriter = ClassName.get("ru.tinkoff.kora.json.common", "EnumJsonWriter");
         b.addType(TypeSpec.classBuilder("JsonWriter").addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
             .addAnnotation(generated())
             .addAnnotation(CommonClassNames.component)
             .addSuperinterface(ParameterizedTypeName.get(JavaClassNames.JSON_WRITER, enumClassName))
-            .addField(ParameterizedTypeName.get(enumJsonWriter, enumClassName, enumDataType), "delegate", Modifier.PRIVATE, Modifier.FINAL)
+            .addField(ParameterizedTypeName.get(JavaClassNames.ENUM_JSON_WRITER, enumClassName, enumDataType), "delegate", Modifier.PRIVATE, Modifier.FINAL)
             .addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterizedTypeName.get(JavaClassNames.JSON_WRITER, enumDataType), "delegate")
-                .addStatement("this.delegate = new $T<>($T.values(), $T::getValue, delegate)", enumJsonWriter, enumClassName, enumClassName)
+                .addStatement("this.delegate = new $T<>($T.values(), $T::getValue, delegate)", JavaClassNames.ENUM_JSON_WRITER, enumClassName, enumClassName)
                 .build()
             )
             .addMethod(MethodSpec.methodBuilder("write")
@@ -262,16 +342,15 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
             .build()
         );
 
-        var enumJsonReader = ClassName.get("ru.tinkoff.kora.json.common", "EnumJsonReader");
         b.addType(TypeSpec.classBuilder("JsonReader").addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
             .addAnnotation(generated())
             .addAnnotation(CommonClassNames.component)
             .addSuperinterface(ParameterizedTypeName.get(JavaClassNames.JSON_READER, enumClassName))
-            .addField(ParameterizedTypeName.get(enumJsonReader, enumClassName, enumDataType), "delegate", Modifier.PRIVATE, Modifier.FINAL)
+            .addField(ParameterizedTypeName.get(JavaClassNames.ENUM_JSON_READER, enumClassName, enumDataType), "delegate", Modifier.PRIVATE, Modifier.FINAL)
             .addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PUBLIC)
                 .addParameter(ParameterizedTypeName.get(JavaClassNames.JSON_READER, enumDataType), "delegate")
-                .addStatement("this.delegate = new $T<>($T.values(), $T::getValue, delegate)", enumJsonReader, enumClassName, enumClassName)
+                .addStatement("this.delegate = new $T<>($T.values(), $T::getValue, delegate)", JavaClassNames.ENUM_JSON_READER, enumClassName, enumClassName)
                 .build()
             )
             .addMethod(MethodSpec.methodBuilder("read")
@@ -281,6 +360,44 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
                 .addParameter(JavaClassNames.JSON_PARSER, "json")
                 .returns(enumClassName)
                 .addStatement("return this.delegate.read(json)")
+                .build()
+            )
+            .build()
+        );
+
+        b.addType(TypeSpec.classBuilder("StringParameterReader")
+            .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+            .addAnnotation(generated())
+            .addAnnotation(CommonClassNames.component)
+            .addSuperinterface(ParameterizedTypeName.get(JavaClassNames.STRING_PARAMETER_READER, enumClassName))
+            .addField(FieldSpec.builder(ParameterizedTypeName.get(JavaClassNames.ENUM_STRING_PARAMETER_READER, enumClassName), "delegate")
+                .initializer(CodeBlock.of("new $T<>($T.values(), v -> String.valueOf(v.value))", JavaClassNames.ENUM_STRING_PARAMETER_READER, enumClassName))
+                .build())
+            .addMethod(MethodSpec.methodBuilder("read")
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(Override.class)
+                .addParameter(String.class, "value")
+                .returns(enumClassName)
+                .addStatement("return this.delegate.read(value)")
+                .build()
+            )
+            .build()
+        );
+
+        b.addType(TypeSpec.classBuilder("StringParameterConverter")
+            .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+            .addAnnotation(generated())
+            .addAnnotation(CommonClassNames.component)
+            .addSuperinterface(ParameterizedTypeName.get(JavaClassNames.STRING_PARAMETER_CONVERTER, enumClassName))
+            .addField(FieldSpec.builder(ParameterizedTypeName.get(JavaClassNames.ENUM_STRING_PARAMETER_CONVERTER, enumClassName), "delegate")
+                .initializer(CodeBlock.of("new $T<>($T.values(), v -> String.valueOf(v.value))", JavaClassNames.ENUM_STRING_PARAMETER_CONVERTER, enumClassName))
+                .build())
+            .addMethod(MethodSpec.methodBuilder("convert")
+                .addModifiers(Modifier.PUBLIC)
+                .addAnnotation(Override.class)
+                .addParameter(enumClassName, "value")
+                .returns(String.class)
+                .addStatement("return this.delegate.convert(value)")
                 .build()
             )
             .build()
@@ -314,160 +431,24 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
                 if (property.isEnum) {
                     yield parent.nestedClass(property.datatypeWithEnum);
                 }
-                yield ClassName.get(this.modelPackage, property.datatypeWithEnum);
+                if (property.getRef() != null) {
+                    yield ClassName.get(this.modelPackage, property.datatypeWithEnum);
+                }
+                if (property.isByteArray || property.isBinary) {
+                    yield ArrayTypeName.of(TypeName.BYTE);
+                }
+                if (property.isMap) {
+                    var propsType = property.getItems();
+                    var valueType = toTypeName(parent, propsType);
+                    yield ParameterizedTypeName.get(ClassName.get(Map.class), ClassName.get(String.class), valueType);
+                }
+                if (property.isArray) {
+                    var propsType = property.getItems();
+                    var valueType = toTypeName(parent, propsType);
+                    yield ParameterizedTypeName.get(ClassName.get(List.class), valueType);
+                }
+                yield ClassName.bestGuess(property.datatypeWithEnum);
             }
         };
     }
 }
-
-
-/*
-
-
-/**
- * NOTE: This class is auto generated by Kora OpenAPI Generator (https://openapi-generator.tech) ({{{generatorVersion}}}).
- * https://openapi-generator.tech
- * Do not edit the class manually.
- * /
-package {{package}};
-
-    import jakarta.annotation.Nullable;
-
-{{#models}}
-    {{#model}}
-    {{#isEnum}}
-
-    {{>javaEnumClass}}
-
-    {{/isEnum}}
-    {{^isEnum}}
-
-    {{#discriminator}}
-/**
- * {{#description}}{{.}}{{/description}}{{^description}}{{classname}}{{/description}}
- * /
-@ru.tinkoff.kora.common.annotation.Generated("openapi generator kora java")
-@ru.tinkoff.kora.json.common.annotation.Json
-@ru.tinkoff.kora.json.common.annotation.JsonDiscriminatorField("{{{propertyBaseName}}}")
-public sealed interface {{classname}} permits {{#vendorExtensions.x-unique-mapped-models}}{{.}}{{^-last}}, {{/-last}}{{/vendorExtensions.x-unique-mapped-models}} {
-    {{#vendorExtensions.x-discriminator-property}}
-    /** {{#description}}{{.}}{{/description}}{{^description}}{{name}}{{/description}} * /
-    {{{datatypeWithEnum}}} {{name}}();{{/vendorExtensions.x-discriminator-property}}
-    {{#allVars}}
-    {{^isDiscriminator}}
-    {{#isEnum}}
-    {{^isContainer}}
-    {{>javaEnumClass}}
-    {{/isContainer}}
-    {{#isContainer}}
-    {{#mostInnerItems}}
-    {{>javaEnumClass}}
-    {{/mostInnerItems}}
-    {{/isContainer}}
-    {{/isEnum}}
-
-    /** {{#description}}{{.}}{{/description}}{{^description}}{{name}}{{/description}} * /
-    {{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}}();{{/isDiscriminator}}{{/allVars}}
-    {{#vendorExtensions.x-discriminator-property}}
-
-    {{^isContainer}}{{>javaEnumClass}}{{/isContainer}}
-    {{#isContainer}}{{#mostInnerItems}}{{>javaEnumClass}}{{/mostInnerItems}}{{/isContainer}}
-    {{/vendorExtensions.x-discriminator-property}}
-    {{#allVars}}{{^isDiscriminator}}{{#example}}
-    /** (example: {{.}}) * /{{/example}}
-    {{{classname}}} with{{#lambda.titlecase}}{{name}}{{/lambda.titlecase}}({{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}});
-    {{/isDiscriminator}}{{/allVars}}
-    }
-    {{/discriminator}}
-    {{^discriminator}}
-/**
- * {{#description}}{{.}}{{/description}}{{^description}}{{classname}}{{/description}}{{#allVars}}
- * @param {{name}} {{#description}}{{.}}{{/description}}{{^description}}{{name}}{{/description}}{{#example}} (example: {{.}}){{/example}}{{/allVars}}
- * /
-@ru.tinkoff.kora.common.annotation.Generated("openapi generator kora java")
-{{#additionalModelTypeAnnotations}}
-{{{.}}}
-    {{/additionalModelTypeAnnotations}}
-@ru.tinkoff.kora.json.common.annotation.JsonWriter{{#vendorExtensions.x-discriminator-value}}
-@ru.tinkoff.kora.json.common.annotation.JsonDiscriminatorValue({{{vendorExtensions.x-discriminator-value}}}){{/vendorExtensions.x-discriminator-value}}{{#vendorExtensions.x-enable-validation}}
-@ru.tinkoff.kora.validation.common.annotation.Valid{{/vendorExtensions.x-enable-validation}}
-
-
-
-
-
-public record {{classname}}(
-    {{#allVars}}
-@ru.tinkoff.kora.json.common.annotation.JsonField("{{baseName}}"){{#vendorExtensions.x-json-include-always}}
-@ru.tinkoff.kora.json.common.annotation.JsonInclude(ru.tinkoff.kora.json.common.annotation.JsonInclude.IncludeType.ALWAYS){{/vendorExtensions.x-json-include-always}}
-  {{#vendorExtensions.x-has-min-max}}@ru.tinkoff.kora.validation.common.annotation.Range(from = {{minimum}}, to = {{maximum}}, boundary = ru.tinkoff.kora.validation.common.annotation.Range.Boundary.{{#exclusiveMinimum}}EXCLUSIVE{{/exclusiveMinimum}}{{^exclusiveMinimum}}INCLUSIVE{{/exclusiveMinimum}}_{{#exclusiveMaximum}}EXCLUSIVE{{/exclusiveMaximum}}{{^exclusiveMaximum}}INCLUSIVE{{/exclusiveMaximum}})
-    {{/vendorExtensions.x-has-min-max}}{{#vendorExtensions.x-has-min-max-items}}@ru.tinkoff.kora.validation.common.annotation.Size(min = {{minItems}}, max = {{maxItems}})
-{{/vendorExtensions.x-has-min-max-items}}{{#vendorExtensions.x-has-min-max-length}}@ru.tinkoff.kora.validation.common.annotation.Size(min = {{minLength}}, max = {{maxLength}})
-{{/vendorExtensions.x-has-min-max-length}}{{#vendorExtensions.x-has-pattern}}@ru.tinkoff.kora.validation.common.annotation.Pattern("{{{pattern}}}")
-{{/vendorExtensions.x-has-pattern}}{{#vendorExtensions.x-has-valid-model}}@ru.tinkoff.kora.validation.common.annotation.Valid
-{{/vendorExtensions.x-has-valid-model}}{{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}}{{^-last}},{{/-last}}
-    {{/allVars}})
-
-
-    {{#vendorExtensions.x-discriminator-value}} implements {{parent}} {{/vendorExtensions.x-discriminator-value}}{
-    {{#isArray}}
-
-public static String schema = """
- {{{items}}}
-""";
-{{/isArray}}
-
-    {{#additionalConstructor}}
-public {{classname}}(
-    {{#requiredVars}}
-    {{^vendorExtensions.x-discriminator-single}}{{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}}{{^-last}}, {{/-last}}{{/vendorExtensions.x-discriminator-single}}
-    {{/requiredVars}}  ) {
-    this({{#allVars}}{{#required}}{{#vendorExtensions.x-discriminator-single}}{{vendorExtensions.x-discriminator-single}}{{/vendorExtensions.x-discriminator-single}}{{^vendorExtensions.x-discriminator-single}}{{name}}{{/vendorExtensions.x-discriminator-single}}{{/required}}{{^required}}null{{/required}}{{^-last}}, {{/-last}}{{/allVars}});
-    }
-    {{/additionalConstructor}}
-    {{#vendorExtensions.x-discriminator-single}}
-public {{classname}}({{#allVars}}{{^isDiscriminator}}
-    {{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}}{{^-last}}, {{/-last}}
-    {{/isDiscriminator}}{{/allVars}}) {
-    this({{#allVars}}{{#isDiscriminator}}{{vendorExtensions.x-discriminator-single}}{{/isDiscriminator}}{{^isDiscriminator}}{{name}}{{/isDiscriminator}}{{^-last}}, {{/-last}}{{/allVars}});
-    }
-    {{/vendorExtensions.x-discriminator-single}}
-@ru.tinkoff.kora.json.common.annotation.JsonReader
-public {{classname}} { {{#vendorExtensions.x-discriminator-values-check}}
-    {{{vendorExtensions.x-discriminator-values-check}}}
-    {{/vendorExtensions.x-discriminator-values-check}}
-    }
-
-    {{#allVars}}
-    {{#isEnum}}
-    {{^isContainer}}
-    {{>javaEnumClass}}
-    {{/isContainer}}
-    {{#isContainer}}
-    {{#mostInnerItems}}
-    {{>javaEnumClass}}
-    {{/mostInnerItems}}
-    {{/isContainer}}
-    {{/isEnum}}
-    {{/allVars}}
-    {{#allVars}}
-
-    {{#example}}
-    /** (example: {{.}}) * /{{/example}}{{#vendorExtensions.x-discriminator-value}}{{#isOverridden}}
-@Override{{/isOverridden}}{{/vendorExtensions.x-discriminator-value}}
-public {{{classname}}} with{{#lambda.titlecase}}{{name}}{{/lambda.titlecase}}({{^vendorExtensions.x-json-nullable}}{{^required}}@Nullable {{/required}}{{{datatypeWithEnum}}}{{/vendorExtensions.x-json-nullable}}{{#vendorExtensions.x-json-nullable}}ru.tinkoff.kora.json.common.JsonNullable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-json-nullable}} {{name}}) {
-    if (this.{{name}} == {{name}}) return this;
-    return new {{{classname}}}({{#allVars}}
-    {{name}}{{^-last}},{{/-last}}{{/allVars}}
-    );
-    }
-    {{/allVars}}
-    }
-
-    {{/discriminator}}
-    {{/isEnum}}
-    {{/model}}
-    {{/models}}
-
-
-    */

@@ -38,7 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.tinkoff.kora.openapi.generator.javagen.JavaGenerator;
 import ru.tinkoff.kora.openapi.generator.javagen.JavaModelGenerator;
-import ru.tinkoff.kora.openapi.generator.javagen.format.FormatterFacade;
+import ru.tinkoff.kora.openapi.generator.kotlingen.KotlinGenerator;
+import ru.tinkoff.kora.openapi.generator.kotlingen.KotlinModelGenerator;
 
 import java.io.File;
 import java.io.IOException;
@@ -385,6 +386,7 @@ public class KoraCodegen extends DefaultCodegen {
     @Override
     public void processOpts() {
         super.processOpts();
+        this.removeEnumValuePrefix = false;
         if (StringUtils.isEmpty(System.getenv("JAVA_POST_PROCESS_FILE"))) {
             LOGGER.info("Environment variable JAVA_POST_PROCESS_FILE not defined so the Java code may not be properly formatted. To define it, try 'export JAVA_POST_PROCESS_FILE=\"/usr/local/bin/clang-format -i\"' (Linux/Mac)");
             LOGGER.info("NOTE: To enable file post-processing, 'enablePostProcessFile' must be set to `true` (--enable-post-process-file for CLI).");
@@ -2617,6 +2619,7 @@ public class KoraCodegen extends DefaultCodegen {
     protected ImmutableMap.Builder<String, Mustache.Lambda> addMustacheLambdas() {
         return super.addMustacheLambdas()
             .put("generateJavaModel", lazyGen(this::javaModelGen))
+            .put("generateKotlinModel", lazyGenKt(this::kotlinModelGen))
             .put("trim", (fragment, out) -> {
                 var text = fragment.execute();
                 out.write(text.trim());
@@ -2632,7 +2635,9 @@ public class KoraCodegen extends DefaultCodegen {
         return new JavaModelGenerator(this.params, this.modelPackage, this.additionalModelTypeAnnotations);
     }
 
-    private static final FormatterFacade formatter = FormatterFacade.create();
+    private KotlinModelGenerator kotlinModelGen() {
+        return new KotlinModelGenerator(this.params, this.modelPackage, this.additionalModelTypeAnnotations);
+    }
 
     private <T> Mustache.Lambda lazyGen(Supplier<JavaGenerator<T>> gen) {
         return (frag, out) -> {
@@ -2640,8 +2645,17 @@ public class KoraCodegen extends DefaultCodegen {
             var javaFile = gen.get().generate(ctx);
             var sw = new StringWriter();
             javaFile.writeTo(sw);
-            var content = formatter.formatSource(javaFile.typeSpec().name(), sw.toString());
-            out.write(content);
+            out.write(sw.toString());
+        };
+    }
+
+    private <T> Mustache.Lambda lazyGenKt(Supplier<KotlinGenerator<T>> gen) {
+        return (frag, out) -> {
+            var ctx = (T) frag.context();
+            var kotlinFile = gen.get().generate(ctx);
+            var sw = new StringWriter();
+            kotlinFile.writeTo(sw);
+            out.write(sw.toString());
         };
     }
 
