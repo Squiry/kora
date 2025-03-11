@@ -258,11 +258,11 @@ class KotlinModelGenerator(
         if (property.isMap) {
             value = Map::class.asClassName().parameterizedBy(STRING, value)
         }
-        if (!property.required) {
-            return value.copy(true)
-        }
         if (property.isNullable && params.enableJsonNullable) {
             return value.copy(false)
+        }
+        if (!property.required) {
+            return value.copy(true)
         }
         return value.copy(false)
     }
