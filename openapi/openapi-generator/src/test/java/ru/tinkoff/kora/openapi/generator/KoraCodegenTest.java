@@ -64,7 +64,7 @@ class KoraCodegenTest {
 
         var files = new String[]{
 //            "/example/petstoreV3_additional_props.yaml",
-            "/example/petstoreV3_enum.yaml",
+//            "/example/petstoreV3_enum.yaml",
 //            "/example/petstoreV3_form.yaml",
 //            "/example/petstoreV3_request_parameters.yaml",
 //            "/example/petstoreV3_types.yaml",
@@ -75,7 +75,7 @@ class KoraCodegenTest {
 //            "/example/petstoreV3_security_basic.yaml",
 //            "/example/petstoreV3_security_bearer.yaml",
 //            "/example/petstoreV3_security_oauth.yaml",
-//            "/example/petstoreV3_discriminator.yaml",
+            "/example/petstoreV3_discriminator.yaml",
 //            "/example/petstoreV3_nullable.yaml",
 //            "/example/petstoreV3.yaml",
 //            "/example/petstoreV2.yaml",

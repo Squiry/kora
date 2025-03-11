@@ -18,14 +18,83 @@ class KotlinModelGenerator(
         if (model.isEnum) {
             @Suppress("UNCHECKED_CAST")
             val enumVars = model.getAllowableValues()["enumVars"] as List<Map<String, String>>
-            val enumType = this.generateEnum(null, model.name, model.dataType, enumVars)
+            val enumType = this.generateEnum(null, model.classname, model.dataType, enumVars)
             return FileSpec.get(modelPackage, enumType)
         }
         if (model.discriminator != null) {
             TODO("Not yet implemented")
         }
+        if (model.allVars.isEmpty()) {
+            return FileSpec.get(modelPackage, TypeSpec.objectBuilder(model.classname).build())
+        }
+        val modelClassName = ClassName(modelPackage, model.classname)
+        val b = TypeSpec.classBuilder(modelClassName)
+            .addModifiers(KModifier.DATA)
+            .addAnnotation(generated())
+            .addAnnotation(KotlinClassNames.jsonWriterAnnotation)
+        model.description?.let { b.addKdoc(it) }
 
-        return FileSpec.get(modelPackage, TypeSpec.classBuilder(model.name).build())
+        for (allVar in model.allVars) {
+            if (allVar.isEnum) {
+                if (allVar.isArray) {
+                    b.addType(generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.mostInnerItems.dataType, allVar.getAllowableValues()["enumVars"] as List<Map<String, String>>))
+                } else {
+                    b.addType(generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.dataType, allVar.getAllowableValues()["enumVars"] as List<Map<String, String>>))
+                }
+            }
+        }
+        for (allVar in model.allVars) {
+            val propertyType = toTypeName(modelClassName, allVar)
+            val property = PropertySpec.builder(allVar.name, propertyType).initializer("%N", allVar.name)
+            allVar.description?.let { property.addKdoc(it) }
+            property.addAnnotation(AnnotationSpec.builder(KotlinClassNames.rangeAnnotation).build())
+            if (params.enableValidation) {
+                // todo validation
+            }
+        }
+
+        val constructor = FunSpec.constructorBuilder()
+            .addAnnotation(KotlinClassNames.jsonReaderAnnotation)
+        for (allVar in model.allVars) {
+            if (!allVar.required) {
+                continue
+            }
+            val propertyType = toTypeName(modelClassName, allVar)
+            if (allVar.isDiscriminator) {
+                val enumVars = allVar.getAllowableValues()["enumVars"] as List<Map<String, String>>?
+                val enumConstants = enumVars!!.map { it["name"] }
+                val check = enumConstants
+                    .map { v: String? -> CodeBlock.of("%N != %T.%N", allVar.name, propertyType, v) }
+                    .joinToCode(" && ")
+
+                constructor.beginControlFlow("if (%L)", check)
+                    .addStatement(
+                        "throw IllegalArgumentException(\"Field %N should have one of the following values: %L; got \" + %N)",
+                        allVar.name,
+                        enumConstants.joinToString(", "),
+                        allVar.name
+                    )
+                    .endControlFlow()
+
+                if (enumConstants.size == 1) {
+                    val enumConstantName = enumConstants.first()
+                    constructor.addParameter(ParameterSpec.builder(allVar.name, propertyType).defaultValue("%T.%N", propertyType, enumConstantName).build())
+                }
+                continue
+            }
+            constructor.addParameter(allVar.name, propertyType)
+        }
+        for (allVar in model.allVars) {
+            if (allVar.required) {
+                continue
+            }
+            val propertyType = toTypeName(modelClassName, allVar)
+            constructor.addParameter(ParameterSpec.builder(allVar.name, propertyType).defaultValue("null").build())
+        }
+
+        b.primaryConstructor(constructor.build())
+
+        return FileSpec.get(modelPackage, b.build())
 
     }
 
@@ -115,14 +184,14 @@ class KotlinModelGenerator(
     }
 
     private fun toTypeName(parent: ClassName?, property: CodegenProperty): TypeName {
-        val value = when (property.datatypeWithEnum) {
-            "Boolean" -> BOOLEAN.copy(true)
-            "Byte" -> BYTE.copy(true)
-            "Short" -> SHORT.copy(true)
-            "Integer", "Int" -> INT.copy(true)
-            "Long" -> LONG.copy(true)
-            "Float" -> FLOAT.copy(true)
-            "Double" -> DOUBLE.copy(true)
+        var value = when (property.datatypeWithEnum) {
+            "Boolean" -> BOOLEAN
+            "Byte" -> BYTE
+            "Short" -> SHORT
+            "Integer", "Int" -> INT
+            "Long" -> LONG
+            "Float" -> FLOAT
+            "Double" -> DOUBLE
             "boolean" -> BOOLEAN
             "byte" -> BYTE
             "short" -> SHORT
@@ -131,33 +200,28 @@ class KotlinModelGenerator(
             "float" -> FLOAT
             "double" -> DOUBLE
             "String" -> String::class.asTypeName()
-            else -> {
-                if (property.isEnum) {
-                    parent!!.nestedClass(property.datatypeWithEnum)
-                } else if (property.ref != null) {
-                    ClassName(this.modelPackage, property.datatypeWithEnum)
-                } else if (property.isByteArray || property.isBinary) {
-                    BYTE_ARRAY
-                } else if (property.isMap) {
-                    val propsType = property.getItems()
-                    val valueType = toTypeName(parent, propsType)
-                    Map::class.asClassName().parameterizedBy(STRING, valueType)
-                } else if (property.isArray) {
-                    val propsType = property.getItems()
-                    val valueType = toTypeName(parent, propsType)
-                    List::class.asClassName().parameterizedBy(valueType)
-                } else {
-                    ClassName.bestGuess(property.datatypeWithEnum)
-                }
+            else -> when {
+                property.isEnum -> parent!!.nestedClass(property.datatypeWithEnum)
+                property.ref != null -> ClassName(this.modelPackage, property.datatypeWithEnum)
+                property.isByteArray || property.isBinary -> BYTE_ARRAY
+                property.isMap -> toTypeName(parent, property.getItems())
+                property.isArray -> toTypeName(parent, property.getItems())
+                else -> ClassName.bestGuess(property.datatypeWithEnum)
             }
+        }
+        if (property.isArray) {
+            value = List::class.asClassName().parameterizedBy(value)
+        }
+        if (property.isMap) {
+            value = Map::class.asClassName().parameterizedBy(STRING, value)
         }
         if (!property.required) {
             return value.copy(true)
         }
         if (property.isNullable && params.enableJsonNullable) {
-            return value.copy(true)
+            return value.copy(false)
         }
-        return value
+        return value.copy(false)
     }
 
     private fun generated() = AnnotationSpec.builder(CommonClassNames.koraGenerated.asKt()).addMember("%S", "kora openapi generator").build()

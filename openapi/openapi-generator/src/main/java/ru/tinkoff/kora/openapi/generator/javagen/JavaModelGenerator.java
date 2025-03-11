@@ -29,7 +29,7 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
     public JavaFile generate(ModelsMap ctx) {
         var model = ctx.getModels().get(0).getModel();
         if (model.isEnum) {
-            var enumType = this.generateEnum(null, model.name, model.dataType, (List<Map<String, String>>) model.getAllowableValues().get("enumVars"));
+            var enumType = this.generateEnum(null, model.classname, model.dataType, (List<Map<String, String>>) model.getAllowableValues().get("enumVars"));
             return JavaFile.builder(this.modelPackage, enumType).build();
         }
         if (model.discriminator != null) {
@@ -67,6 +67,14 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
         var requiredOnlyConstructor = MethodSpec.constructorBuilder()
             .addModifiers(Modifier.PUBLIC)
             .addCode("this(");
+        for (var allVar : model.allVars) {
+            if (allVar.isEnum) {
+                var enumType = allVar.isArray
+                    ? this.generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.mostInnerItems.dataType, (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars"))
+                    : this.generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.dataType, (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars"));
+                b.addType(enumType);
+            }
+        }
 
         var witherCode = CodeBlock.of("return new $T$L;\n", ClassName.get(this.modelPackage, model.classname), model.allVars.stream().map(s -> CodeBlock.of("$N", s.name)).collect(CodeBlock.joining(", ", "(", ")")));
         for (int i = 0; i < model.allVars.size(); i++) {
@@ -74,12 +82,6 @@ public class JavaModelGenerator implements JavaGenerator<ModelsMap> {
                 requiredOnlyConstructor.addCode(", ");
             }
             var allVar = model.allVars.get(i);
-            if (allVar.isEnum) {
-                var enumType = allVar.isArray
-                    ? this.generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.mostInnerItems.dataType, (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars"))
-                    : this.generateEnum(modelClassName, allVar.datatypeWithEnum, allVar.dataType, (List<Map<String, String>>) allVar.getAllowableValues().get("enumVars"));
-                b.addType(enumType);
-            }
             var propertyTypeName = toTypeName(modelClassName, allVar);
             if (allVar.isDiscriminator) {
                 var propertyEnumType = propertyTypeName;
