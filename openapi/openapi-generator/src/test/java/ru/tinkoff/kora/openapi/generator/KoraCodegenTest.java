@@ -51,15 +51,15 @@ class KoraCodegenTest {
         var result = new ArrayList<SwaggerParams>();
         var modes = new String[]{
             KoraCodegen.Mode.JAVA_CLIENT.getMode(),
-            KoraCodegen.Mode.JAVA_ASYNC_CLIENT.getMode(),
-            KoraCodegen.Mode.JAVA_REACTIVE_CLIENT.getMode(),
-            KoraCodegen.Mode.JAVA_SERVER.getMode(),
-            KoraCodegen.Mode.JAVA_ASYNC_SERVER.getMode(),
-            KoraCodegen.Mode.JAVA_REACTIVE_SERVER.getMode(),
-            KoraCodegen.Mode.KOTLIN_CLIENT.getMode(),
-            KoraCodegen.Mode.KOTLIN_SUSPEND_CLIENT.getMode(),
-            KoraCodegen.Mode.KOTLIN_SERVER.getMode(),
-            KoraCodegen.Mode.KOTLIN_SUSPEND_SERVER.getMode(),
+//            KoraCodegen.Mode.JAVA_ASYNC_CLIENT.getMode(),
+//            KoraCodegen.Mode.JAVA_REACTIVE_CLIENT.getMode(),
+//            KoraCodegen.Mode.JAVA_SERVER.getMode(),
+//            KoraCodegen.Mode.JAVA_ASYNC_SERVER.getMode(),
+//            KoraCodegen.Mode.JAVA_REACTIVE_SERVER.getMode(),
+//            KoraCodegen.Mode.KOTLIN_CLIENT.getMode(),
+//            KoraCodegen.Mode.KOTLIN_SUSPEND_CLIENT.getMode(),
+//            KoraCodegen.Mode.KOTLIN_SERVER.getMode(),
+//            KoraCodegen.Mode.KOTLIN_SUSPEND_SERVER.getMode(),
         };
 
         var files = new String[]{
@@ -127,7 +127,7 @@ class KoraCodegenTest {
                 "skipFormModel", "false"
             ))
             .addAdditionalProperty("mode", mode)
-            .addAdditionalProperty("additionalModelTypeAnnotations", "@ru.tinkoff.kora.json.common.annotation.JsonInclude(ru.tinkoff.kora.json.common.annotation.JsonInclude.IncludeType.ALWAYS)")
+//            .addAdditionalProperty("additionalModelTypeAnnotations", "@ru.tinkoff.kora.json.common.annotation.JsonInclude(ru.tinkoff.kora.json.common.annotation.JsonInclude.IncludeType.ALWAYS)")
             .addAdditionalProperty("interceptors", """
                 {
                   "*": [

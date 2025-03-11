@@ -17,9 +17,14 @@ dependencies {
     api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${libs.versions.jackson.get()}")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${libs.versions.jackson.get()}")
 
+    implementation project(':annotation-processor-common')
     implementation libs.caffeine
     implementation libs.commons.codec
     implementation libs.commons.io
+    implementation libs.javapoet
+    implementation(libs.goethe) {
+        exclude group: 'com.squareup', module: 'javapoet'
+    }
 
     testImplementation(project(":json:json-common"))
     testImplementation(project(":json:jackson-module"))

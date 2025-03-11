@@ -112,7 +112,7 @@ byte-buddy-core = { module = "net.bytebuddy:byte-buddy", version = "1.14.9" }
 byte-buddy-agent = { module = "net.bytebuddy:byte-buddy-agent", version = "1.14.9" }
 
 javapoet = { module = "com.palantir.javapoet:javapoet", version = "0.6.0" }
-goethe = { module = "com.palantir.javapoet:goethe", version = "0.6.0" }
+goethe = { module = "com.palantir.goethe:goethe", version = "0.14.0" }
 classgraph = { module = "io.github.classgraph:classgraph", version = "4.8.170" }
 
 lettuce-core = { module = "io.lettuce:lettuce-core", version = "6.5.2.RELEASE" }

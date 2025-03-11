@@ -143,5 +143,6 @@ components:
                 code:
                     type: integer
                     format: int32
+                    description: Error code
                 message:
                     type: string

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.google.common.base.Strings;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.samskivert.mustache.Mustache;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -35,9 +36,13 @@ import org.openapitools.codegen.utils.CamelizeOption;
 import org.openapitools.codegen.utils.ModelUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.tinkoff.kora.openapi.generator.javagen.JavaGenerator;
+import ru.tinkoff.kora.openapi.generator.javagen.JavaModelGenerator;
+import ru.tinkoff.kora.openapi.generator.javagen.format.FormatterFacade;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -51,6 +56,7 @@ import static org.openapitools.codegen.utils.StringUtils.*;
 public class KoraCodegen extends DefaultCodegen {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(KoraCodegen.class);
+    private JavaModelGenerator javaModelGenerator;
 
     public enum Mode {
         JAVA_CLIENT("java-client"),
@@ -121,7 +127,7 @@ public class KoraCodegen extends DefaultCodegen {
         return "kora";
     }
 
-    record CodegenParams(
+    public record CodegenParams(
         Mode codegenMode,
         String jsonAnnotation,
         boolean enableValidation,
@@ -685,6 +691,9 @@ public class KoraCodegen extends DefaultCodegen {
                         childModel.vendorExtensions.put("x-discriminator-value", params.codegenMode.isJava()
                             ? enumStringValue
                             : "[" + enumStringValue + "]");
+                        if (params.codegenMode.isJava()) {
+                            childModel.vendorExtensions.put("x-discriminator-value", mappings.stream().map(s -> toEnumVarName(s, "String")).toList());
+                        }
                         var valuesCheck = new StringBuilder();
                         valuesCheck.append("if (").append(discriminatorProperty.name).append(" != ").append(enumValue).append(") {\n");
                         if (params.codegenMode.isKotlin()) {
@@ -706,6 +715,9 @@ public class KoraCodegen extends DefaultCodegen {
                             ));
                         childModel.vendorExtensions.put("x-discriminator-value", discriminatorValue);
                         childModel.vendorExtensions.put("x-discriminator-keys", discriminatorValue);
+                        if (params.codegenMode.isJava()) {
+                            childModel.vendorExtensions.put("x-discriminator-value", mappings.stream().map(s -> toEnumVarName(s, "String")).toList());
+                        }
                         var valuesCheck = new StringBuilder();
                         var discriminatorValueCheck = mappings.stream()
                             .map(it -> "%s != %s.%s.%s".formatted(discriminatorProperty.name, model.classname, discriminatorProperty.datatypeWithEnum, toEnumVarName(it, "String")))
@@ -871,9 +883,9 @@ public class KoraCodegen extends DefaultCodegen {
             var models = (List<Map<String, Object>>) model.get("models");
             var codegenModel = (CodegenModel) models.get(0).get("model");
             var additionalConstructor = codegenModel.getHasVars()
-                                        && !codegenModel.getVars().isEmpty()
-                                        && !codegenModel.getAllVars().isEmpty()
-                                        && codegenModel.getAllVars().size() != codegenModel.getRequiredVars().size();
+                && !codegenModel.getVars().isEmpty()
+                && !codegenModel.getAllVars().isEmpty()
+                && codegenModel.getAllVars().size() != codegenModel.getRequiredVars().size();
             for (var requiredVar : codegenModel.requiredVars) {
                 // discriminator is somehow present in both optional and required vars, so we should clean it up
                 codegenModel.optionalVars.removeIf(p -> Objects.equals(p.name, requiredVar.name));
@@ -2111,10 +2123,10 @@ public class KoraCodegen extends DefaultCodegen {
         } else if (authMethod.isKeyInCookie) {
             fakeAuthParameter.isCookieParam = true;
         } else if (authMethod.isOAuth
-                   || authMethod.isOpenId
-                   || authMethod.isBasicBearer
-                   || authMethod.isBasic
-                   || authMethod.isBasicBasic) {
+            || authMethod.isOpenId
+            || authMethod.isBasicBearer
+            || authMethod.isBasic
+            || authMethod.isBasicBasic) {
             fakeAuthParameter.isHeaderParam = true;
 
             for (CodegenParameter parameter : parameters) {
@@ -2164,8 +2176,8 @@ public class KoraCodegen extends DefaultCodegen {
 
     public static boolean isContentJson(CodegenParameter parameter) {
         return parameter.containerType != null
-               && (parameter.containerType.startsWith("application/json") || parameter.containerType.startsWith("text/json"))
-               || isContentJson(parameter.getContent());
+            && (parameter.containerType.startsWith("application/json") || parameter.containerType.startsWith("text/json"))
+            || isContentJson(parameter.getContent());
     }
 
     public static boolean isContentJson(@Nullable Map<String, CodegenMediaType> content) {
@@ -2604,6 +2616,7 @@ public class KoraCodegen extends DefaultCodegen {
     @Override
     protected ImmutableMap.Builder<String, Mustache.Lambda> addMustacheLambdas() {
         return super.addMustacheLambdas()
+            .put("generateJavaModel", lazyGen(this::javaModelGen))
             .put("trim", (fragment, out) -> {
                 var text = fragment.execute();
                 out.write(text.trim());
@@ -2613,6 +2626,23 @@ public class KoraCodegen extends DefaultCodegen {
                 out.write(this.upperCase(toVarName(text)));
             })
             ;
+    }
+
+    private JavaModelGenerator javaModelGen() {
+        return new JavaModelGenerator(this.params, this.modelPackage, this.additionalModelTypeAnnotations);
+    }
+
+    private static final FormatterFacade formatter = FormatterFacade.create();
+
+    private <T> Mustache.Lambda lazyGen(Supplier<JavaGenerator<T>> gen) {
+        return (frag, out) -> {
+            var ctx = (T) frag.context();
+            var javaFile = gen.get().generate(ctx);
+            var sw = new StringWriter();
+            javaFile.writeTo(sw);
+            var content = formatter.formatSource(javaFile.typeSpec().name(), sw.toString());
+            out.write(content);
+        };
     }
 
     @Override

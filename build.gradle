@@ -229,6 +229,7 @@ subprojects {
         jvmArgs([
             '-XX:FlightRecorderOptions=stackdepth=1024',
             '--enable-preview',
+            '--add-opens', 'jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
             '--add-opens', 'jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
             '--add-opens', 'jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED',
             '--add-opens', 'jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
@@ -238,6 +239,17 @@ subprojects {
             '--add-opens', 'jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
             '--add-opens', 'jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED',
             '--add-opens', 'jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.jvm=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+
         ])
         useJUnitPlatform()
         testLogging {
