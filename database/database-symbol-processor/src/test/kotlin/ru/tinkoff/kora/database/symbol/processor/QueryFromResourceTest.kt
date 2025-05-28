@@ -16,7 +16,7 @@ class QueryFromResourceTest {
         val cl = symbolProcessFiles(
             listOf(
                 "src/test/kotlin/ru/tinkoff/kora/database/symbol/processor/repository/QueryFromResourceRepository.kt",
-            )
+            ), listOf(RepositorySymbolProcessorProvider())
         )
         val repository = cl.loadClass("ru.tinkoff.kora.database.symbol.processor.repository.\$QueryFromResourceRepository_Impl")
             .constructors[0]

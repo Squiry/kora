@@ -15,10 +15,10 @@ import ru.tinkoff.kora.kafka.symbol.processor.KafkaClassNames
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.isAnnotationPresent
 import ru.tinkoff.kora.ksp.common.BaseSymbolProcessor
-import ru.tinkoff.kora.ksp.common.CommonAopUtils
+import ru.tinkoff.kora.ksp.common.CommonAopUtils.hasAopAnnotations
 import ru.tinkoff.kora.ksp.common.CommonClassNames
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 
 class KafkaPublisherSymbolProcessor(val env: SymbolProcessorEnvironment) : BaseSymbolProcessor(env) {
 
@@ -47,7 +47,7 @@ class KafkaPublisherSymbolProcessor(val env: SymbolProcessorEnvironment) : BaseS
                 if (proxySupertypeDecl !is KSClassDeclaration) continue
                 for (publisher in proxySupertypeDecl.superTypes) {
                     val publisherDeclaration = publisher.resolve().declaration as KSClassDeclaration
-                    if (CommonAopUtils.hasAopAnnotations(publisherDeclaration)) {
+                    if (publisherDeclaration.hasAopAnnotations()) {
                         val annotation = publisherDeclaration.findAnnotation(KafkaClassNames.kafkaPublisherAnnotation)
                             ?: continue
                         val publishMethods = publisherDeclaration.getAllFunctions()
@@ -55,7 +55,7 @@ class KafkaPublisherSymbolProcessor(val env: SymbolProcessorEnvironment) : BaseS
                             .toList()
 
                         val topicConfig = if (publishMethods.any { it.isAnnotationPresent(KafkaClassNames.kafkaTopicAnnotation) }) {
-                            ClassName(publisherDeclaration.packageName.asString(), publisherDeclaration.generatedClassName("TopicConfig"))
+                            ClassName(publisherDeclaration.packageName.asString(), publisherDeclaration.generatedClass("TopicConfig"))
                         } else {
                             null
                         }
@@ -86,7 +86,7 @@ class KafkaPublisherSymbolProcessor(val env: SymbolProcessorEnvironment) : BaseS
                     publisherGenerator.generatePublisherImpl(producer, publishMethods, topicConfig)
 
                     // we'll generate module after aop proxy generated
-                    if (!CommonAopUtils.hasAopAnnotations(producer)) {
+                    if (!producer.hasAopAnnotations()) {
                         publisherGenerator.generatePublisherModule(producer, publishMethods, annotation, topicConfig, null)
                     }
                     continue

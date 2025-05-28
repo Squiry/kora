@@ -91,4 +91,13 @@ abstract class BaseSymbolProcessor(environment: SymbolProcessorEnvironment) : Sy
     }
 
     abstract fun processRound(resolver: Resolver): List<KSAnnotated>
+
+
+    inline fun <A, R> context(a: A, block: context(A) () -> R): R {
+        return block(a)
+    }
+
+    fun <A, B, R> context(a: A, b: B, block: context(A, B) () -> R): R {
+        return block(a, b)
+    }
 }

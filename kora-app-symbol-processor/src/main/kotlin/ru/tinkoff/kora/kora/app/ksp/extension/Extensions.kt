@@ -1,6 +1,5 @@
 package ru.tinkoff.kora.kora.app.ksp.extension
 
-import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSType
@@ -8,13 +7,14 @@ import java.util.*
 
 data class Extensions(val extensions: List<KoraExtension>) {
     companion object {
-        fun load(classLoader: ClassLoader, resolver: Resolver, kspLogger: KSPLogger, codeGenerator: CodeGenerator): Extensions {
+        fun load(classLoader: ClassLoader, resolver: Resolver, kspLogger: KSPLogger): Extensions {
             val serviceLoader = ServiceLoader.load(ExtensionFactory::class.java, classLoader)
-            return Extensions(serviceLoader.mapNotNull { it.create(resolver, kspLogger, codeGenerator) })
+            return Extensions(serviceLoader.mapNotNull { it.create(resolver, kspLogger) })
         }
     }
 
-    fun findExtension(resolver: Resolver, type: KSType, tags: Set<String>): (() -> ExtensionResult)? {
+    context(resolver: Resolver)
+    fun findExtension(type: KSType, tags: Set<String>): (() -> ExtensionResult)? {
         val extensions = ArrayList<() -> ExtensionResult>()
         for (extension in this.extensions) {
             val generator = extension.getDependencyGenerator(resolver, type, tags)

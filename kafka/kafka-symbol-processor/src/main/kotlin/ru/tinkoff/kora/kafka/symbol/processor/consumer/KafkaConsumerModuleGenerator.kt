@@ -1,6 +1,7 @@
 package ru.tinkoff.kora.kafka.symbol.processor.consumer
 
 import com.google.devtools.ksp.getDeclaredFunctions
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.FileSpec
@@ -16,6 +17,7 @@ class KafkaConsumerModuleGenerator(
     private val kafkaConfigGenerator: KafkaConsumerConfigGenerator,
     private val kafkaContainerGenerator: KafkaContainerGenerator
 ) {
+    context(r: Resolver)
     fun generateModule(declaration: KSClassDeclaration): FileSpec {
         val classBuilder = TypeSpec.interfaceBuilder(declaration.simpleName.asString() + "Module")
             .addOriginatingKSFile(declaration.containingFile!!)

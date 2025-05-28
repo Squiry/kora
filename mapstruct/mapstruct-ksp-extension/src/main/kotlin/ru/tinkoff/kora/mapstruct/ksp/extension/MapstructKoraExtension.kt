@@ -12,6 +12,7 @@ import ru.tinkoff.kora.kora.app.ksp.extension.ExtensionResult
 import ru.tinkoff.kora.kora.app.ksp.extension.KoraExtension
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.TagUtils.parseTags
+import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
 
 object MapstructKoraExtension : KoraExtension {
 
@@ -39,7 +40,7 @@ object MapstructKoraExtension : KoraExtension {
         return {
             val implementation = resolver.getClassDeclarationByName("$packageName.$expectedName")
             if (implementation == null) {
-                ExtensionResult.RequiresCompilingResult
+                throw ProcessingErrorException("Mapper implementation not found for $declaration", declaration)
             } else {
                 val constructor = implementation.getConstructors().first()
                 ExtensionResult.fromConstructor(constructor, implementation)

@@ -7,6 +7,7 @@ dependencies {
     api project(':symbol-processor-common')
     api project(':kora-app-symbol-processor')
 
+    testAnnotationProcessor(project(':json:json-annotation-processor'))
     testImplementation project(':json:json-common')
     testImplementation testFixtures(project(':symbol-processor-common'))
 }

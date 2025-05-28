@@ -66,22 +66,23 @@ class CassandraUdtTest : AbstractRepositoryTest() {
     @Test
     fun testUdtExtension() {
         compile0(
+            processors,
             """
-                @ru.tinkoff.kora.database.cassandra.annotation.UDT
-                data class UdtEntity(val value1: String, val value2: String)
-            """.trimIndent(), """
-                        @KoraApp
-                        interface Application {
-                            @Root
-                            fun entityParameterMapper(m1: CassandraParameterColumnMapper<UdtEntity>) = ""
-                            @Root
-                            fun entityListParameterMapper(m1: CassandraParameterColumnMapper<List<UdtEntity>>) = ""
-                            @Root
-                            fun entityResultMapper(m: CassandraRowColumnMapper<UdtEntity>) = ""
-                            @Root
-                            fun entityListResultMapper(m: CassandraRowColumnMapper<List<UdtEntity>>) = ""
-                        }
-                    """.trimIndent()
+                        @ru.tinkoff.kora.database.cassandra.annotation.UDT
+                        data class UdtEntity(val value1: String, val value2: String)
+                    """.trimIndent(), """
+                                @KoraApp
+                                interface Application {
+                                    @Root
+                                    fun entityParameterMapper(m1: CassandraParameterColumnMapper<UdtEntity>) = ""
+                                    @Root
+                                    fun entityListParameterMapper(m1: CassandraParameterColumnMapper<List<UdtEntity>>) = ""
+                                    @Root
+                                    fun entityResultMapper(m: CassandraRowColumnMapper<UdtEntity>) = ""
+                                    @Root
+                                    fun entityListResultMapper(m: CassandraRowColumnMapper<List<UdtEntity>>) = ""
+                                }
+                            """.trimIndent()
         )
 
         compileResult.assertSuccess()

@@ -10,7 +10,7 @@ import ru.tinkoff.kora.database.symbol.processor.cassandra.CassandraNativeTypes
 import ru.tinkoff.kora.database.symbol.processor.cassandra.CassandraTypes
 import ru.tinkoff.kora.database.symbol.processor.model.DbEntity
 import ru.tinkoff.kora.ksp.common.KotlinPoetUtils.controlFlow
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 
 class UserDefinedTypeStatementSetterGenerator(private val environment: SymbolProcessorEnvironment) {
 
@@ -23,7 +23,7 @@ class UserDefinedTypeStatementSetterGenerator(private val environment: SymbolPro
         val type = classDeclaration.asType(listOf())
         val typeName = type.toTypeName().copy(false)
         val entity = DbEntity.parseEntity(type)!!
-        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClassName("CassandraParameterColumnMapper"))
+        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClass("CassandraParameterColumnMapper"))
             .addModifiers(KModifier.PUBLIC, KModifier.FINAL)
             .addSuperinterface(CassandraTypes.parameterColumnMapper.parameterizedBy(typeName))
         val constructor = FunSpec.constructorBuilder()
@@ -54,7 +54,7 @@ class UserDefinedTypeStatementSetterGenerator(private val environment: SymbolPro
         val typeName = type.toTypeName()
         val listTypeName = LIST.parameterizedBy(typeName.copy(false)).copy(false)
         val entity = DbEntity.parseEntity(type)!!
-        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClassName("List_CassandraParameterColumnMapper"))
+        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClass("List_CassandraParameterColumnMapper"))
             .addModifiers(KModifier.PUBLIC, KModifier.FINAL)
             .addSuperinterface(CassandraTypes.parameterColumnMapper.parameterizedBy(listTypeName))
         val constructor = FunSpec.constructorBuilder()

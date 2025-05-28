@@ -13,10 +13,11 @@ data class ComponentInterceptors(
 ) {
 
     companion object {
-        fun parseInterceptors(ctx: ProcessingContext, components: Collection<ResolvedComponent>): ComponentInterceptors {
+        context(ctx: ProcessingContext)
+        fun parseInterceptors(components: Collection<ResolvedComponent>): ComponentInterceptors {
             val interceptors = ArrayList<ComponentInterceptor>()
             for (component in components) {
-                val factory = parseInterceptor(ctx, component)
+                val factory = parseInterceptor(component)
                 if (factory != null) {
                     interceptors.add(factory)
                 }
@@ -24,7 +25,8 @@ data class ComponentInterceptors(
             return ComponentInterceptors(ServiceTypesHelper(ctx.resolver), ctx.resolver, interceptors)
         }
 
-        private fun parseInterceptor(ctx: ProcessingContext, component: ResolvedComponent): ComponentInterceptor? {
+        context(ctx: ProcessingContext)
+        private fun parseInterceptor(component: ResolvedComponent): ComponentInterceptor? {
             if (!ctx.serviceTypesHelper.isInterceptor(component.type)) {
                 return null
             }

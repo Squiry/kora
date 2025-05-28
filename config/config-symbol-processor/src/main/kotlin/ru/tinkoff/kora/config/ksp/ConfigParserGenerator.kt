@@ -19,7 +19,7 @@ import ru.tinkoff.kora.ksp.common.KotlinPoetUtils.controlFlow
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.toTypeName
 import ru.tinkoff.kora.ksp.common.exception.ProcessingError
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 
 class ConfigParserGenerator(private val resolver: Resolver) {
 
@@ -30,7 +30,7 @@ class ConfigParserGenerator(private val resolver: Resolver) {
             return Either.right(f.right())
         }
 
-        val typeName = element.generatedClassName(ConfigClassNames.configValueExtractor.simpleName)
+        val typeName = element.generatedClass(ConfigClassNames.configValueExtractor.simpleName)
         val typeBuilder = TypeSpec.classBuilder(typeName)
             .addSuperinterface(ConfigClassNames.configValueExtractor.parameterizedBy(targetType.toTypeName()))
             .generated(ConfigParserGenerator::class)
@@ -117,7 +117,7 @@ class ConfigParserGenerator(private val resolver: Resolver) {
         if (f.isRight) {
             return Either.right(f.right())
         }
-        val typeName: String = element.generatedClassName(ConfigClassNames.configValueExtractor.simpleName)
+        val typeName: String = element.generatedClass(ConfigClassNames.configValueExtractor.simpleName)
         val typeBuilder = TypeSpec.classBuilder(typeName)
             .addSuperinterface(ConfigClassNames.configValueExtractor.parameterizedBy(targetType.toTypeName().copy(false)))
             .generated(ConfigParserGenerator::class)
@@ -169,7 +169,7 @@ class ConfigParserGenerator(private val resolver: Resolver) {
             return Either.right(f.right())
         }
 
-        val typeName = decl.generatedClassName(ConfigClassNames.configValueExtractor.simpleName)
+        val typeName = decl.generatedClass(ConfigClassNames.configValueExtractor.simpleName)
         val typeBuilder = TypeSpec.classBuilder(typeName)
             .addSuperinterface(ConfigClassNames.configValueExtractor.parameterizedBy(targetType.toTypeName().copy(false)))
             .generated(ConfigParserGenerator::class)
@@ -221,7 +221,7 @@ class ConfigParserGenerator(private val resolver: Resolver) {
             return Either.right(f.right())
         }
 
-        val typeName = decl.generatedClassName(ConfigClassNames.configValueExtractor.simpleName)
+        val typeName = decl.generatedClass(ConfigClassNames.configValueExtractor.simpleName)
         val typeBuilder = TypeSpec.classBuilder(typeName)
             .addSuperinterface(ConfigClassNames.configValueExtractor.parameterizedBy(targetType.toTypeName().copy(false)))
             .generated(ConfigParserGenerator::class)

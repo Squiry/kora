@@ -1,13 +1,17 @@
 package ru.tinkoff.kora.kora.app.ksp
 
-import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.isOpen
+import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.ksp.*
+import com.squareup.kotlinpoet.ksp.toClassName
+import com.squareup.kotlinpoet.ksp.toTypeName
+import com.squareup.kotlinpoet.ksp.toTypeParameterResolver
+import com.squareup.kotlinpoet.ksp.toTypeVariableName
+import ru.tinkoff.kora.kora.app.ksp.GraphResolutionHelper.findDependency
 import ru.tinkoff.kora.kora.app.ksp.component.ComponentDependency
 import ru.tinkoff.kora.kora.app.ksp.component.ComponentDependencyHelper
 import ru.tinkoff.kora.kora.app.ksp.component.DependencyClaim
@@ -15,46 +19,53 @@ import ru.tinkoff.kora.kora.app.ksp.component.DependencyClaim.DependencyClaimTyp
 import ru.tinkoff.kora.kora.app.ksp.component.ResolvedComponent
 import ru.tinkoff.kora.kora.app.ksp.declaration.ComponentDeclaration
 import ru.tinkoff.kora.kora.app.ksp.exception.CircularDependencyException
-import ru.tinkoff.kora.kora.app.ksp.exception.NewRoundException
 import ru.tinkoff.kora.kora.app.ksp.exception.UnresolvedDependencyException
 import ru.tinkoff.kora.kora.app.ksp.extension.ExtensionResult
 import ru.tinkoff.kora.ksp.common.CommonClassNames
 import ru.tinkoff.kora.ksp.common.KotlinPoetUtils.controlFlow
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
-import ru.tinkoff.kora.ksp.common.getOuterClassesAsPrefix
 import java.util.*
 import java.util.stream.Collectors
 
 object GraphBuilder {
-    fun processProcessing(ctx: ProcessingContext, p: ProcessingState.Processing, forClaim: DependencyClaim? = null): ProcessingState {
-        if (p.rootSet.isEmpty()) {
-            return ProcessingState.Failed(
-                ProcessingErrorException(
-                    "@KoraApp has no root components, expected at least one component annotated with @Root",
-                    p.root
-                ),
-                p.resolutionStack
+    data class Graph(val root: KSClassDeclaration, val allModules: List<KSClassDeclaration>, val components: List<ResolvedComponent>, val promisedProxies: List<TypeSpec>)
+
+    fun List<ResolvedComponent>.findResolvedComponent(declaration: ComponentDeclaration) = asSequence().filter { it.declaration === declaration }.firstOrNull()
+    sealed interface ResolutionFrame {
+        data class Root(val rootIndex: Int) : ResolutionFrame
+        data class Component(
+            val declaration: ComponentDeclaration,
+            val dependenciesToFind: List<DependencyClaim> = ComponentDependencyHelper.parseDependencyClaim(declaration),
+            val resolvedDependencies: MutableList<ComponentDependency> = ArrayList(dependenciesToFind.size),
+            val currentDependency: Int = 0
+        ) : ResolutionFrame
+    }
+
+    context(ctx: ProcessingContext, resolver: Resolver)
+    fun buildGraph(forClaim: DependencyClaim? = null): Graph {
+        if (ctx.src.rootSet.isEmpty()) {
+            throw ProcessingErrorException(
+                "@KoraApp has no root components, expected at least one component annotated with @Root",
+                ctx.src.root
             )
         }
-        var processing = p;
-        var stack = processing.resolutionStack
-        frame@ while (stack.isNotEmpty()) {
-            val frame = stack.removeLast()
-            if (frame is ProcessingState.ResolutionFrame.Root) {
-                val declaration = processing.rootSet[frame.rootIndex]
-                if (processing.findResolvedComponent(declaration) != null) {
+        frame@ while (ctx.stack.isNotEmpty()) {
+            val frame = ctx.stack.removeLast()
+            if (frame is GraphBuilder.ResolutionFrame.Root) {
+                val declaration = ctx.src.rootSet[frame.rootIndex]
+                if (ctx.components.findResolvedComponent(declaration) != null) {
                     continue
                 }
-                stack.addLast(ProcessingState.ResolutionFrame.Component(declaration))
-                stack.addAll(findInterceptors(ctx, processing, declaration))
+                ctx.stack.addLast(GraphBuilder.ResolutionFrame.Component(declaration))
+                ctx.stack.addAll(findInterceptors(declaration))
                 continue
             }
-            frame as ProcessingState.ResolutionFrame.Component
+            frame as GraphBuilder.ResolutionFrame.Component
             val declaration = frame.declaration
             val dependenciesToFind = frame.dependenciesToFind
             val resolvedDependencies = frame.resolvedDependencies
-            if (checkCycle(ctx, processing, declaration)) {
+            if (checkCycle(declaration)) {
                 continue
             }
 
@@ -62,7 +73,7 @@ object GraphBuilder {
                 val dependencyClaim = dependenciesToFind[currentDependency]
                 ctx.kspLogger.info("Resolving ${dependencyClaim.type} for ${declaration.source}")
                 if (dependencyClaim.claimType in listOf(ALL, ALL_OF_PROMISE, ALL_OF_VALUE)) {
-                    val allOfDependency = processAllOf(ctx, processing, frame, currentDependency)
+                    val allOfDependency = processAllOf(frame, currentDependency)
                     if (allOfDependency == null) {
                         continue@frame
                     } else {
@@ -74,53 +85,44 @@ object GraphBuilder {
                     resolvedDependencies.add(ComponentDependency.TypeOfDependency(dependencyClaim))
                     continue@dependency
                 }
-                val dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, processing.resolvedComponents, dependencyClaim)
+                val dependencyComponent = findDependency(declaration, dependencyClaim)
                 if (dependencyComponent != null) {
                     resolvedDependencies.add(dependencyComponent)
                     continue@dependency
                 }
-                val dependencyDeclaration = GraphResolutionHelper.findDependencyDeclaration(ctx, declaration, processing.sourceDeclarations, dependencyClaim)
+                val dependencyDeclaration = GraphResolutionHelper.findDependencyDeclaration(declaration, dependencyClaim)
                 if (dependencyDeclaration != null) {
-                    stack.addLast(frame.copy(currentDependency = currentDependency))
-                    stack.addLast(ProcessingState.ResolutionFrame.Component(dependencyDeclaration))
-                    stack.addAll(findInterceptors(ctx, processing, dependencyDeclaration))
+                    ctx.stack.addLast(frame.copy(currentDependency = currentDependency))
+                    ctx.stack.addLast(GraphBuilder.ResolutionFrame.Component(dependencyDeclaration))
+                    ctx.stack.addAll(findInterceptors(dependencyDeclaration))
                     continue@frame
                 }
-                val templates = GraphResolutionHelper.findDependencyDeclarationsFromTemplate(ctx, declaration, processing.templateDeclarations, dependencyClaim)
+                val templates = GraphResolutionHelper.findDependencyDeclarationsFromTemplate(dependencyClaim)
                 if (templates.isNotEmpty()) {
                     if (templates.size == 1) {
                         val template = templates[0]
-                        processing.sourceDeclarations.add(template)
-                        stack.addLast(frame.copy(currentDependency = currentDependency))
-                        stack.addLast(ProcessingState.ResolutionFrame.Component(template))
-                        stack.addAll(findInterceptors(ctx, processing, template))
+                        ctx.sourceDeclarations.add(template)
+                        ctx.stack.addLast(frame.copy(currentDependency = currentDependency))
+                        ctx.stack.addLast(GraphBuilder.ResolutionFrame.Component(template))
+                        ctx.stack.addAll(findInterceptors(template))
                         continue@frame
                     }
-                    val results = ArrayList<ProcessingState>(templates.size)
+                    val results = ArrayList<Graph>(templates.size)
                     var exception: UnresolvedDependencyException? = null
                     for (template in templates) {
-                        val newProcessing: ProcessingState.Processing = ProcessingState.Processing(
-                            processing.root,
-                            processing.allModules,
-                            ArrayList(processing.sourceDeclarations),
-                            ArrayList(processing.templateDeclarations),
-                            processing.rootSet,
-                            ArrayList(processing.resolvedComponents),
-                            ArrayDeque(processing.resolutionStack)
-                        )
-                        newProcessing.sourceDeclarations.add(template)
-                        newProcessing.resolutionStack.addLast(frame.copy(currentDependency = currentDependency))
-                        newProcessing.resolutionStack.addLast(ProcessingState.ResolutionFrame.Component(template))
-                        newProcessing.resolutionStack.addAll(this.findInterceptors(ctx, processing, template))
+                        fun <A, R> context(a: A, block: context(A) () -> R): R {
+                            return block(a)
+                        }
+
+                        val fork = ctx.fork()
+                        fork.sourceDeclarations.add(template)
+                        fork.stack.addLast(frame.copy(currentDependency = currentDependency))
+                        fork.stack.addLast(GraphBuilder.ResolutionFrame.Component(template))
+                        fork.stack.addAll(findInterceptors(template))
                         try {
-                            results.add(this.processProcessing(ctx, newProcessing, dependencyClaim))
-                        } catch (e: NewRoundException) {
-                            results.add(ProcessingState.NewRoundRequired(
-                                e.source,
-                                e.type,
-                                e.tag,
-                                e.resolving
-                            ))
+                            context(fork) {
+                                results.add(buildGraph(dependencyClaim))
+                            }
                         } catch (e: UnresolvedDependencyException) {
                             if (exception != null) {
                                 exception.addSuppressed(e)
@@ -130,14 +132,7 @@ object GraphBuilder {
                         }
                     }
                     if (results.size == 1) {
-                        val result = results[0]
-                        if (result is ProcessingState.Processing) {
-                            stack = result.resolutionStack
-                            processing = result
-                            continue@frame
-                        } else {
-                            return result
-                        }
+                        return results[0]
                     }
                     if (results.size > 1) {
                         val deps = templates.stream().map { Objects.toString(it) }
@@ -160,12 +155,12 @@ object GraphBuilder {
                 if (dependencyClaim.type.declaration.qualifiedName!!.asString() == "java.util.Optional") {
                     // todo just add predefined template
                     val optionalDeclaration = ComponentDeclaration.OptionalComponent(dependencyClaim.type, dependencyClaim.tags)
-                    processing.sourceDeclarations.add(optionalDeclaration)
-                    stack.addLast(frame.copy(currentDependency = currentDependency))
+                    ctx.sourceDeclarations.add(optionalDeclaration)
+                    ctx.stack.addLast(frame.copy(currentDependency = currentDependency))
                     val type = dependencyClaim.type.arguments[0].type!!.resolve().makeNullable()
                     val claim = ComponentDependencyHelper.parseClaim(type, dependencyClaim.tags, declaration.source)
-                    stack.addLast(
-                        ProcessingState.ResolutionFrame.Component(
+                    ctx.stack.addLast(
+                        GraphBuilder.ResolutionFrame.Component(
                             optionalDeclaration, listOf(
                                 claim
                             )
@@ -173,39 +168,40 @@ object GraphBuilder {
                     )
                     continue@frame
                 }
-                val finalClassComponent = GraphResolutionHelper.findFinalDependency(ctx, dependencyClaim)
+                val finalClassComponent = GraphResolutionHelper.findFinalDependency(dependencyClaim)
                 if (finalClassComponent != null) {
-                    processing.sourceDeclarations.add(finalClassComponent)
-                    stack.addLast(frame.copy(currentDependency = currentDependency))
-                    stack.addLast(ProcessingState.ResolutionFrame.Component(finalClassComponent))
-                    stack.addAll(findInterceptors(ctx, processing, finalClassComponent))
+                    ctx.sourceDeclarations.add(finalClassComponent)
+                    ctx.stack.addLast(frame.copy(currentDependency = currentDependency))
+                    ctx.stack.addLast(GraphBuilder.ResolutionFrame.Component(finalClassComponent))
+                    ctx.stack.addAll(findInterceptors(finalClassComponent))
                     continue@frame
                 }
-                val extension = ctx.extensions.findExtension(ctx.resolver, dependencyClaim.type, dependencyClaim.tags)
+                val extension = ctx.extensions.findExtension(dependencyClaim.type, dependencyClaim.tags)
                 if (extension != null) {
                     val extensionResult = extension()
-                    if (extensionResult is ExtensionResult.RequiresCompilingResult) {
-                        stack.addLast(frame.copy(currentDependency = currentDependency))
-                        throw NewRoundException(processing, extension, dependencyClaim.type, dependencyClaim.tags)
-                    } else if (extensionResult is ExtensionResult.CodeBlockResult) {
-                        val extensionComponent = ComponentDeclaration.fromExtension(extensionResult)
-                        if (extensionComponent.isTemplate()) {
-                            processing.templateDeclarations.add(extensionComponent)
-                        } else {
-                            processing.sourceDeclarations.add(extensionComponent)
+                    when (extensionResult) {
+                        is ExtensionResult.CodeBlockResult -> {
+                            val extensionComponent = ComponentDeclaration.fromExtension(extensionResult)
+                            if (extensionComponent.isTemplate()) {
+                                ctx.templateDeclarations.add(extensionComponent)
+                            } else {
+                                ctx.sourceDeclarations.add(extensionComponent)
+                            }
+                            ctx.stack.addLast(frame.copy(currentDependency = currentDependency))
+                            continue@frame
                         }
-                        stack.addLast(frame.copy(currentDependency = currentDependency))
-                        continue@frame
-                    } else {
-                        extensionResult as ExtensionResult.GeneratedResult
-                        val extensionComponent = ComponentDeclaration.fromExtension(ctx, extensionResult)
-                        if (extensionComponent.isTemplate()) {
-                            processing.templateDeclarations.add(extensionComponent)
-                        } else {
-                            processing.sourceDeclarations.add(extensionComponent)
+
+                        else -> {
+                            extensionResult as ExtensionResult.GeneratedResult
+                            val extensionComponent = ComponentDeclaration.fromExtension(extensionResult)
+                            if (extensionComponent.isTemplate()) {
+                                ctx.templateDeclarations.add(extensionComponent)
+                            } else {
+                                ctx.sourceDeclarations.add(extensionComponent)
+                            }
+                            ctx.stack.addLast(frame.copy(currentDependency = currentDependency))
+                            continue@frame
                         }
-                        stack.addLast(frame.copy(currentDependency = currentDependency))
-                        continue@frame
                     }
                 }
                 val hints = ctx.dependencyHintProvider.findHints(dependencyClaim.type, dependencyClaim.tags)
@@ -231,9 +227,9 @@ object GraphBuilder {
                     dependencyClaim.tags
                 )
             }
-            processing.resolvedComponents.add(
+            ctx.components.add(
                 ResolvedComponent(
-                    processing.resolvedComponents.size,
+                    ctx.components.size,
                     declaration,
                     declaration.type,
                     declaration.tags,
@@ -241,13 +237,8 @@ object GraphBuilder {
                     resolvedDependencies
                 )
             )
-            if (forClaim != null) {
-                if (forClaim.tagsMatches(declaration.tags) && forClaim.type.isAssignableFrom(declaration.type)) {
-                    return processing
-                }
-            }
         }
-        return ProcessingState.Ok(processing.root, processing.allModules, ArrayList(processing.resolvedComponents))
+        return Graph(ctx.src.root, ctx.src.allModules, ArrayList(ctx.components), ArrayList(ctx.promisedProxies))
     }
 
 
@@ -264,20 +255,21 @@ object GraphBuilder {
         return null
     }
 
-    private fun processAllOf(ctx: ProcessingContext, processing: ProcessingState.Processing, componentFrame: ProcessingState.ResolutionFrame.Component, currentDependency: Int): ComponentDependency? {
+    context(ctx: ProcessingContext)
+    private fun processAllOf(componentFrame: GraphBuilder.ResolutionFrame.Component, currentDependency: Int): ComponentDependency? {
         val dependencyClaim = componentFrame.dependenciesToFind[currentDependency]
-        val dependencies = GraphResolutionHelper.findDependencyDeclarations(ctx, processing.sourceDeclarations, dependencyClaim)
+        val dependencies = GraphResolutionHelper.findDependencyDeclarations(dependencyClaim)
         for (dependency in dependencies) {
             if (dependency.isDefault()) {
                 continue
             }
-            val resolved = processing.findResolvedComponent(dependency)
+            val resolved = ctx.components.findResolvedComponent(dependency)
             if (resolved != null) {
                 continue
             }
-            processing.resolutionStack.addLast(componentFrame.copy(currentDependency = currentDependency))
-            processing.resolutionStack.addLast(ProcessingState.ResolutionFrame.Component(dependency))
-            processing.resolutionStack.addAll(findInterceptors(ctx, processing, dependency))
+            ctx.stack.addLast(componentFrame.copy(currentDependency = currentDependency))
+            ctx.stack.addLast(GraphBuilder.ResolutionFrame.Component(dependency))
+            ctx.stack.addAll(this.findInterceptors(dependency))
             return null
         }
         if (dependencyClaim.claimType == ALL || dependencyClaim.claimType == ALL_OF_VALUE || dependencyClaim.claimType == ALL_OF_PROMISE) {
@@ -286,27 +278,20 @@ object GraphBuilder {
         throw IllegalStateException()
     }
 
-    private fun findInterceptors(ctx: ProcessingContext, processing: ProcessingState.Processing, declaration: ComponentDeclaration): List<ProcessingState.ResolutionFrame.Component> {
-        return GraphResolutionHelper.findInterceptorDeclarations(ctx, processing.sourceDeclarations, declaration.type)
+    context(ctx: ProcessingContext)
+    private fun findInterceptors(declaration: ComponentDeclaration): List<GraphBuilder.ResolutionFrame.Component> {
+        return GraphResolutionHelper.findInterceptorDeclarations(declaration.type)
             .asSequence()
-            .filter { id -> processing.resolvedComponents.none { it.declaration === id } && processing.resolutionStack.none { it is ProcessingState.ResolutionFrame.Component && it.declaration == id } }
-            .map { ProcessingState.ResolutionFrame.Component(it) }
+            .filter { id -> ctx.components.none { it.declaration === id } && ctx.stack.none { it is GraphBuilder.ResolutionFrame.Component && it.declaration == id } }
+            .map { GraphBuilder.ResolutionFrame.Component(it) }
             .toList()
 
     }
 
-    private fun generatePromisedProxy(ctx: ProcessingContext, claimTypeDeclaration: KSClassDeclaration): ComponentDeclaration {
-        val resultClassName = claimTypeDeclaration.getOuterClassesAsPrefix() + claimTypeDeclaration.simpleName.asString() + "_PromisedProxy"
-        val packageName = claimTypeDeclaration.packageName.asString()
-        val alreadyGenerated = ctx.resolver.getClassDeclarationByName("$packageName.$resultClassName")
-        if (alreadyGenerated != null) {
-            return ComponentDeclaration.PromisedProxyComponent(
-                claimTypeDeclaration.asType(listOf()), // some weird behaviour here: asType with empty list returns type with type parameters as type, no other way to get them
-                claimTypeDeclaration,
-                ClassName(packageName, resultClassName)
-            )
-        }
-
+    context(ctx: ProcessingContext)
+    private fun generatePromisedProxy(claimTypeDeclaration: KSClassDeclaration): ComponentDeclaration {
+        val graphName = "${ctx.src.root.simpleName.asString()}Graph"
+        val resultClassName = ClassName(ctx.src.root.packageName.asString(), graphName, "PromisedProxy" + ctx.promisedProxies.size)
         val typeTpr = claimTypeDeclaration.typeParameters.toTypeParameterResolver()
         val typeParameters = claimTypeDeclaration.typeParameters.map { it.toTypeVariableName(typeTpr) }
         val typeName = if (typeParameters.isEmpty()) claimTypeDeclaration.toClassName() else claimTypeDeclaration.toClassName().parameterizedBy(typeParameters)
@@ -332,19 +317,19 @@ object GraphBuilder {
             )
             .addFunction(
                 FunSpec.builder("getDelegate")
-                .addModifiers(KModifier.PRIVATE)
-                .returns(typeName)
+                    .addModifiers(KModifier.PRIVATE)
+                    .returns(typeName)
                     .addCode(
                         CodeBlock.builder()
-                    .addStatement("var delegate = this.delegate")
-                    .controlFlow("if (delegate == null)") {
-                        addStatement("delegate = this.promise.get().get()!!")
-                        addStatement("this.delegate = delegate")
-                    }
-                    .addStatement("return delegate")
+                            .addStatement("var delegate = this.delegate")
+                            .controlFlow("if (delegate == null)") {
+                                addStatement("delegate = this.promise.get().get()!!")
+                                addStatement("this.delegate = delegate")
+                            }
+                            .addStatement("return delegate")
+                            .build()
+                    )
                     .build()
-                )
-                .build()
             )
         for (typeParameter in claimTypeDeclaration.typeParameters) {
             type.addTypeVariable(typeParameter.toTypeVariableName(typeTpr))
@@ -387,22 +372,19 @@ object GraphBuilder {
                 .build()
             type.addProperty(prop)
         }
-
-        val file = FileSpec.builder(packageName, resultClassName)
-            .addType(type.build())
-            .build()
-        file.writeTo(ctx.codeGenerator, true)
+        ctx.promisedProxies.add(type.build())
 
         return ComponentDeclaration.PromisedProxyComponent(
             claimTypeDeclaration.asType(listOf()), // some weird behaviour here: asType with empty list returns type with type parameters as type, no other way to get them
             claimTypeDeclaration,
-            ClassName(packageName, resultClassName)
+            resultClassName
         )
     }
 
-    private fun checkCycle(ctx: ProcessingContext, processing: ProcessingState.Processing, declaration: ComponentDeclaration): Boolean {
-        val prevFrame = processing.resolutionStack.peekLast()
-        if (prevFrame !is ProcessingState.ResolutionFrame.Component) {
+    context(ctx: ProcessingContext)
+    private fun checkCycle(declaration: ComponentDeclaration): Boolean {
+        val prevFrame = ctx.stack.peekLast()
+        if (prevFrame !is GraphBuilder.ResolutionFrame.Component) {
             return false
         }
         if (prevFrame.dependenciesToFind.isEmpty()) {
@@ -410,8 +392,8 @@ object GraphBuilder {
         }
         val dependencyClaim = prevFrame.dependenciesToFind[prevFrame.currentDependency]
         val claimTypeDeclaration = dependencyClaim.type.declaration
-        for (frame in processing.resolutionStack) {
-            if (frame !is ProcessingState.ResolutionFrame.Component || frame.declaration !== declaration) {
+        for (frame in ctx.stack) {
+            if (frame !is GraphBuilder.ResolutionFrame.Component || frame.declaration !== declaration) {
                 continue
             }
             val circularDependencyException = CircularDependencyException(listOf(prevFrame.declaration.toString(), declaration.toString()), frame.declaration)
@@ -420,24 +402,24 @@ object GraphBuilder {
             val proxyDependencyClaim = DependencyClaim(
                 dependencyClaim.type, setOf(CommonClassNames.promisedProxy.canonicalName), dependencyClaim.claimType
             )
-            val alreadyGenerated = GraphResolutionHelper.findDependency(ctx, prevFrame.declaration, processing.resolvedComponents, proxyDependencyClaim)
+            val alreadyGenerated = findDependency(prevFrame.declaration, proxyDependencyClaim)
             if (alreadyGenerated != null) {
-                processing.resolutionStack.removeLast()
+                ctx.stack.removeLast()
                 prevFrame.resolvedDependencies.add(alreadyGenerated)
-                processing.resolutionStack.addLast(prevFrame.copy(currentDependency = prevFrame.currentDependency + 1))
+                ctx.stack.addLast(prevFrame.copy(currentDependency = prevFrame.currentDependency + 1))
                 return true
             }
-            var proxyComponentDeclaration = GraphResolutionHelper.findDependencyDeclarationFromTemplate(ctx, declaration, processing.templateDeclarations, proxyDependencyClaim)
+            var proxyComponentDeclaration = GraphResolutionHelper.findDependencyDeclarationFromTemplate(declaration, proxyDependencyClaim)
             if (proxyComponentDeclaration == null) {
-                proxyComponentDeclaration = generatePromisedProxy(ctx, claimTypeDeclaration)
+                proxyComponentDeclaration = generatePromisedProxy(claimTypeDeclaration)
                 if (claimTypeDeclaration.typeParameters.isNotEmpty()) {
-                    processing.templateDeclarations.add(proxyComponentDeclaration)
+                    ctx.templateDeclarations.add(proxyComponentDeclaration)
                 } else {
-                    processing.sourceDeclarations.add(proxyComponentDeclaration)
+                    ctx.sourceDeclarations.add(proxyComponentDeclaration)
                 }
             }
             val proxyResolvedComponent = ResolvedComponent(
-                processing.resolvedComponents.size,
+                ctx.components.size,
                 proxyComponentDeclaration,
                 dependencyClaim.type,
                 setOf(CommonClassNames.promisedProxy.canonicalName),
@@ -452,7 +434,7 @@ object GraphBuilder {
                     )
                 )
             )
-            processing.resolvedComponents.add(proxyResolvedComponent)
+            ctx.components.add(proxyResolvedComponent)
             return true
         }
         return false

@@ -12,11 +12,8 @@ sealed interface ExtensionResult {
         val componentType: KSType,
         val componentTag: Set<String>,
         val dependencyTypes: List<KSType>,
-        val dependencyTags: List<Set<String>>) : ExtensionResult {
-    }
-
-
-    object RequiresCompilingResult : ExtensionResult
+        val dependencyTags: List<Set<String>>
+    ) : ExtensionResult
 
     companion object {
         fun fromConstructor(constructor: KSFunctionDeclaration, type: KSClassDeclaration): ExtensionResult {

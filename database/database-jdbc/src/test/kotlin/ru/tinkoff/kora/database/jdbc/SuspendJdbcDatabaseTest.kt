@@ -10,12 +10,12 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.slf4j.LoggerFactory
 import ru.tinkoff.kora.common.Context
 import ru.tinkoff.kora.database.common.telemetry.DefaultDataBaseTelemetryFactory
-import ru.tinkoff.kora.database.jdbc.`$JdbcDatabaseConfig_ConfigValueExtractor`.*
+import ru.tinkoff.kora.database.jdbc.`$JdbcDatabaseConfig_ConfigValueExtractor`.JdbcDatabaseConfig_Impl
 import ru.tinkoff.kora.database.jdbc.JdbcHelper.SqlRunnable
-import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_ConfigValueExtractor`.*
-import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_LogConfig_ConfigValueExtractor`.*
-import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_MetricsConfig_ConfigValueExtractor`.*
-import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_TracingConfig_ConfigValueExtractor`.*
+import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_ConfigValueExtractor`.TelemetryConfig_Impl
+import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_LogConfig_ConfigValueExtractor`.LogConfig_Impl
+import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_MetricsConfig_ConfigValueExtractor`.MetricsConfig_Impl
+import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_TracingConfig_ConfigValueExtractor`.TracingConfig_Impl
 import ru.tinkoff.kora.test.postgres.PostgresParams
 import ru.tinkoff.kora.test.postgres.PostgresParams.ResultSetMapper
 import ru.tinkoff.kora.test.postgres.PostgresTestContainer
@@ -76,9 +76,9 @@ internal class SuspendJdbcDatabaseTest {
     @Test
     fun testTransaction(params: PostgresParams) {
         val tableName = "test_table_" + PostgresTestContainer.randomName("test_table")
-        params.execute("CREATE TABLE %s(id BIGSERIAL, value VARCHAR);".formatted(tableName))
-        val id = "INSERT INTO %s(value) VALUES ('test1');".formatted(tableName)
-        val sql = "INSERT INTO %s(value) VALUES ('test1');".formatted(tableName)
+        params.execute("CREATE TABLE %s(id BIGSERIAL, value VARCHAR);".format(tableName))
+        val id = "INSERT INTO %s(value) VALUES ('test1');".format(tableName)
+        val sql = "INSERT INTO %s(value) VALUES ('test1');".format(tableName)
         val extractor =
             ResultSetMapper<List<String>, RuntimeException> { rs: ResultSet ->
                 val result = ArrayList<String>()
@@ -107,7 +107,7 @@ internal class SuspendJdbcDatabaseTest {
             }
 
             var values = params.query(
-                "SELECT value FROM %s".formatted(tableName), extractor
+                "SELECT value FROM %s".format(tableName), extractor
             )
             Assertions.assertThat(values).hasSize(0)
 
@@ -118,7 +118,7 @@ internal class SuspendJdbcDatabaseTest {
             })
 
             values = params.query(
-                "SELECT value FROM %s".formatted(tableName), extractor
+                "SELECT value FROM %s".format(tableName), extractor
             )
             Assertions.assertThat(values).hasSize(1)
         }

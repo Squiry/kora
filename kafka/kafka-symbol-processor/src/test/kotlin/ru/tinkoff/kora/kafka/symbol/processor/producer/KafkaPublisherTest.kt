@@ -25,52 +25,76 @@ class KafkaPublisherTest : AbstractSymbolProcessorTest() {
         """.trimIndent()
     }
 
+    val processors = listOf(KafkaPublisherSymbolProcessorProvider())
+
     @Test
     fun testPublisherWithRecord() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              fun send(record: ProducerRecord<String, String>)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      fun send(record: ProducerRecord<String, String>)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithRecordAndCallback() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              fun send(record: ProducerRecord<String, String>, callback: Callback)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      fun send(record: ProducerRecord<String, String>, callback: Callback)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithRecordWithKeyTag() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              fun send(record: ProducerRecord<@Tag(String::class) String, String>, callback: Callback)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      fun send(record: ProducerRecord<@Tag(String::class) String, String>, callback: Callback)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = loadClass("\$TestProducer_PublisherModule")
         assertThat(clazz).isNotNull()
-        val m = clazz.getMethod("testProducer_PublisherFactory", KafkaProducerTelemetryFactory::class.java, KafkaPublisherConfig::class.java, Serializer::class.java, Serializer::class.java)
+        val m = clazz.getMethod(
+            "testProducer_PublisherFactory",
+            KafkaProducerTelemetryFactory::class.java,
+            KafkaPublisherConfig::class.java,
+            Serializer::class.java,
+            Serializer::class.java
+        )
         assertThat(m).isNotNull()
         assertThat(m.parameters[2].getAnnotationsByType(Tag::class.java)).isNotEmpty()
         assertThat(m.parameters[2].getAnnotationsByType(Tag::class.java)[0].value).isEqualTo(arrayOf(String::class))
@@ -80,17 +104,25 @@ class KafkaPublisherTest : AbstractSymbolProcessorTest() {
     @Test
     fun testPublisherWithRecordWithValueTag() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              fun send(record: ProducerRecord<String, @Tag(String::class) String>)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      fun send(record: ProducerRecord<String, @Tag(String::class) String>)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = loadClass("\$TestProducer_PublisherModule")
         assertThat(clazz).isNotNull()
-        val m = clazz.getMethod("testProducer_PublisherFactory", KafkaProducerTelemetryFactory::class.java, KafkaPublisherConfig::class.java, Serializer::class.java, Serializer::class.java)
+        val m = clazz.getMethod(
+            "testProducer_PublisherFactory",
+            KafkaProducerTelemetryFactory::class.java,
+            KafkaPublisherConfig::class.java,
+            Serializer::class.java,
+            Serializer::class.java
+        )
         assertThat(m).isNotNull()
         assertThat(m.parameters[2].getAnnotationsByType(Tag::class.java)).isEmpty()
         assertThat(m.parameters[3].getAnnotationsByType(Tag::class.java)).isNotEmpty()
@@ -100,68 +132,100 @@ class KafkaPublisherTest : AbstractSymbolProcessorTest() {
     @Test
     fun testPublisherWithValue() {
         compile0(
-            """
-            @ru.tinkoff.kora.kafka.common.annotation.KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @ru.tinkoff.kora.kafka.common.annotation.KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithValueAndCallback() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test")
-              fun send(value: String, callback: Callback)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test")
+                      fun send(value: String, callback: Callback)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithValueAndHeaders() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(value: String, headers: Headers)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(value: String, headers: Headers)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithValueWithTag() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(@Tag(String::class) value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(@Tag(String::class) value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_PublisherModule")
-        val m = clazz.getMethod("testProducer_PublisherFactory", KafkaProducerTelemetryFactory::class.java, KafkaPublisherConfig::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        val m = clazz.getMethod(
+            "testProducer_PublisherFactory",
+            KafkaProducerTelemetryFactory::class.java,
+            KafkaPublisherConfig::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
         assertThat(m).isNotNull()
         assertThat(m.parameters[3].getAnnotationsByType(Tag::class.java)).isNotEmpty()
         assertThat(m.parameters[3].getAnnotationsByType(Tag::class.java)[0].value).isEqualTo(arrayOf(String::class))
@@ -170,51 +234,78 @@ class KafkaPublisherTest : AbstractSymbolProcessorTest() {
     @Test
     fun testPublisherWithKeyAndValue() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(key: Long, value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(key: Long, value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java, Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java,
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithKeyAndValueAndHeaders() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(key: Long, value: String, headers: Headers)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(key: Long, value: String, headers: Headers)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java, Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java,
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testPublisherWithKeyAndValueWithTag() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(key: Long, @Tag(String::class) value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(key: Long, @Tag(String::class) value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_PublisherModule")
-        val m = clazz.getMethod("testProducer_PublisherFactory", KafkaProducerTelemetryFactory::class.java, KafkaPublisherConfig::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java, Serializer::class.java)
+        val m = clazz.getMethod(
+            "testProducer_PublisherFactory",
+            KafkaProducerTelemetryFactory::class.java,
+            KafkaPublisherConfig::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java,
+            Serializer::class.java
+        )
         assertThat(m).isNotNull()
         assertThat(m.parameters[3].getAnnotationsByType(Tag::class.java)).isEmpty()
         assertThat(m.parameters[4].getAnnotationsByType(Tag::class.java)).isNotEmpty()
@@ -224,33 +315,43 @@ class KafkaPublisherTest : AbstractSymbolProcessorTest() {
     @Test
     fun testPublisherWithValueRelativeConfigPath() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic(".sendTopic")
-              fun send(value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic(".sendTopic")
+                      fun send(value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testTxPublisher() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(key: Long, value: String)
-            }
-            """.trimIndent(), """
-                        @KafkaPublisher("test")
-                        interface TxProducer : TransactionalPublisher<TestProducer>                
-                        """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(key: Long, value: String)
+                    }
+                    """.trimIndent(), """
+                                @KafkaPublisher("test")
+                                interface TxProducer : TransactionalPublisher<TestProducer>                
+                                """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TxProducer_Impl")
@@ -260,99 +361,141 @@ class KafkaPublisherTest : AbstractSymbolProcessorTest() {
     @Test
     fun testReturnVoid() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testReturnVoidSuspend() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              suspend fun send(value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      suspend fun send(value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testReturnRecordMetadata() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(value: String): RecordMetadata
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(value: String): RecordMetadata
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testReturnRecordMetadataSuspend() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              suspend fun send(value: String): RecordMetadata
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      suspend fun send(value: String): RecordMetadata
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testReturnFutureRecordMetadata() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              fun send(value: String): Future<RecordMetadata>
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      fun send(value: String): Future<RecordMetadata>
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$TestProducer_Impl")
         assertThat(clazz).isNotNull()
-        clazz.getConstructor(KafkaProducerTelemetryFactory::class.java, TelemetryConfig::class.java, Properties::class.java, compileResult.loadClass("\$TestProducer_TopicConfig"), Serializer::class.java)
+        clazz.getConstructor(
+            KafkaProducerTelemetryFactory::class.java,
+            TelemetryConfig::class.java,
+            Properties::class.java,
+            compileResult.loadClass("\$TestProducer_TopicConfig"),
+            Serializer::class.java
+        )
     }
 
     @Test
     fun testAop() {
         compile0(
-            """
-            @KafkaPublisher("test")
-            interface TestProducer {
-              @Topic("test.sendTopic")
-              @ru.tinkoff.kora.logging.common.annotation.Log
-              fun send(value: String)
-            }
-            """.trimIndent()
+            processors, *arrayOf<String>(
+                """
+                    @KafkaPublisher("test")
+                    interface TestProducer {
+                      @Topic("test.sendTopic")
+                      @ru.tinkoff.kora.logging.common.annotation.Log
+                      fun send(value: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
     }

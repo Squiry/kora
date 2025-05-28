@@ -313,58 +313,6 @@ class SealedTest : AbstractJsonSymbolProcessorTest() {
     }
 
     @Test
-    fun testSealedInterfaceJsonReaderExtension() {
-        compile(
-            """
-            @JsonDiscriminatorField("@type")
-            sealed interface TestInterface {
-                data class Impl1(val value: String) : TestInterface
-                data class Impl2(val value: Int) : TestInterface
-            }
-            """.trimIndent(),
-            """
-                @KoraApp
-                interface TestApp {
-                  @Root
-                  fun root(w: ru.tinkoff.kora.json.common.JsonReader<TestInterface>) = ""
-                }
-            """.trimIndent()
-        )
-        val graph = loadClass("TestAppGraph").toGraph()
-        val reader = graph.findByType(readerClass("TestInterface")) as JsonReader<Any?>
-
-        reader.assertRead("{\"@type\":\"Impl1\",\"value\":\"test\"}", new("TestInterface\$Impl1", "test"))
-        reader.assertRead("{\"@type\":\"Impl2\",\"value\":42}", new("TestInterface\$Impl2", 42))
-    }
-
-    @Test
-    fun testSealedInterfaceJsonWriterExtension() {
-        compile(
-            """
-            @JsonDiscriminatorField("@type")
-            sealed interface TestInterface {
-                data class Impl1(val value: String) : TestInterface
-                data class Impl2(val value: Int) : TestInterface
-            }
-            """.trimIndent(),
-            """
-                @KoraApp
-                interface TestApp {
-                  @Root
-                  fun root(w: ru.tinkoff.kora.json.common.JsonWriter<TestInterface>) = ""
-                }
-            """.trimIndent()
-        )
-
-        val graph = loadClass("TestAppGraph").toGraph()
-        val writer = graph.findByType(writerClass("TestInterface")) as JsonWriter<Any>
-
-        writer.assertWrite(new("TestInterface\$Impl1", "test"), "{\"@type\":\"Impl1\",\"value\":\"test\"}")
-        writer.assertWrite(new("TestInterface\$Impl2", 42), "{\"@type\":\"Impl2\",\"value\":42}")
-    }
-
-
-    @Test
     fun testSealedInterfaceJsonReaderExtensionWithProcessor() {
         compile(
             """

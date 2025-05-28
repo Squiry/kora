@@ -1,10 +1,7 @@
 package ru.tinkoff.kora.database.symbol.processor.jdbc
 
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.verify
-import ru.tinkoff.kora.ksp.common.GraphUtil.toGraph
 
 class JdbcAopTest : AbstractJdbcRepositoryTest() {
 
@@ -39,7 +36,7 @@ class JdbcAopTest : AbstractJdbcRepositoryTest() {
         )
         classAsStrs.addAll(sources)
 
-        compile0(*classAsStrs.toTypedArray())
+        compile0(processors, *classAsStrs.toTypedArray())
         compileResult.assertSuccess()
     }
 

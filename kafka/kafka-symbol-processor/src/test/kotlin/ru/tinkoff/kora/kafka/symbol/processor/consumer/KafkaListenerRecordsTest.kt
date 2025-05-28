@@ -2,12 +2,11 @@ package ru.tinkoff.kora.kafka.symbol.processor.consumer
 
 import org.apache.kafka.common.serialization.Deserializer
 import org.assertj.core.api.Assertions
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import ru.tinkoff.kora.application.graph.ValueOf
 import ru.tinkoff.kora.common.Tag
 import ru.tinkoff.kora.kafka.common.consumer.ConsumerAwareRebalanceListener
 import ru.tinkoff.kora.kafka.common.consumer.KafkaListenerConfig
-import ru.tinkoff.kora.kafka.common.consumer.containers.handlers.KafkaRecordsHandler
 import ru.tinkoff.kora.kafka.common.consumer.telemetry.KafkaConsumerTelemetryFactory
 
 class KafkaListenerRecordsTest : AbstractKafkaListenerAnnotationProcessorTest() {
@@ -40,23 +39,22 @@ class KafkaListenerRecordsTest : AbstractKafkaListenerAnnotationProcessorTest() 
     }
 
     @Test
-    @Disabled("Is not supported by ksp yet")
     fun testProcessRecordsWithTags() {
         compile(
             """
             class KafkaListenerClass {
                 @KafkaListener("test.config.path")
-                fun process(event: ConsumerRecords<@Tag(KafkaListener::class) String, @Tag(String::class) String>) {
+                fun process(event: ConsumerRecords<@Tag(KafkaListenerClass::class) String, @Tag(String::class) String>) {
                 }
             }
             """.trimIndent()
         )
 
-        val module = compileResult.loadClass("KafkaListenerModule")
+        val module = compileResult.loadClass("KafkaListenerClassModule")
         val container = module.getMethod(
-            "kafkaListenerProcessContainer",
+            "kafkaListenerClassProcessContainer",
             KafkaListenerConfig::class.java,
-            KafkaRecordsHandler::class.java,
+            ValueOf::class.java,
             Deserializer::class.java,
             Deserializer::class.java,
             KafkaConsumerTelemetryFactory::class.java,
@@ -69,9 +67,9 @@ class KafkaListenerRecordsTest : AbstractKafkaListenerAnnotationProcessorTest() 
         val valueTag = valueDeserializer.getAnnotation(Tag::class.java)
 
         Assertions.assertThat(keyTag).isNotNull()
-        Assertions.assertThat(keyTag.value.map { it.java }).isEqualTo(listOf(compileResult.loadClass("KafkaListener")))
+        Assertions.assertThat(keyTag.value.map { it.java }).isEqualTo(listOf(compileResult.loadClass("KafkaListenerClass")))
         Assertions.assertThat(valueTag).isNotNull()
-        Assertions.assertThat(valueTag.value.map { it.java }).isEqualTo(listOf(compileResult.loadClass("KafkaListener")))
+        Assertions.assertThat(valueTag.value.map { it.java }).isEqualTo(listOf(String::class.java))
     }
 
     @Test

@@ -14,7 +14,7 @@ import ru.tinkoff.kora.ksp.common.AnnotationUtils.findValueNoDefault
 import ru.tinkoff.kora.ksp.common.CommonAopUtils.extendsKeepAop
 import ru.tinkoff.kora.ksp.common.CommonClassNames
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 import java.util.*
 import java.util.function.Function
 import java.util.function.Supplier
@@ -26,11 +26,11 @@ class KafkaPublisherTransactionalGenerator(
 
     fun generatePublisherTransactionalModule(txPublisher: KSClassDeclaration, publisher: KSClassDeclaration, annotation: KSAnnotation) {
         val packageName = txPublisher.packageName.asString()
-        val implementationName = txPublisher.generatedClassName("Impl")
+        val implementationName = txPublisher.generatedClass("Impl")
         val implementationTypeName = ClassName(packageName, implementationName)
         val publisherPackageName = publisher.packageName.asString()
-        val publisherImplementationTypeName = ClassName(publisherPackageName, publisher.generatedClassName("Impl"))
-        val moduleName = txPublisher.generatedClassName("Module")
+        val publisherImplementationTypeName = ClassName(publisherPackageName, publisher.generatedClass("Impl"))
+        val moduleName = txPublisher.generatedClass("Module")
         val module = TypeSpec.interfaceBuilder(moduleName)
             .addOriginatingKSFile(txPublisher.containingFile!!)
             .addAnnotation(CommonClassNames.module)
@@ -69,8 +69,8 @@ class KafkaPublisherTransactionalGenerator(
     fun generatePublisherTransactionalImpl(typeElement: KSClassDeclaration, publisherType: ClassName, publisherTypeElement: KSClassDeclaration) {
         val packageName = typeElement.packageName.asString()
         val publisherPackageName = publisherTypeElement.packageName.asString()
-        val implementationName = typeElement.generatedClassName("Impl")
-        val publisherImplementationTypeName = ClassName(publisherPackageName, publisherTypeElement.generatedClassName("Impl"))
+        val implementationName = typeElement.generatedClass("Impl")
+        val publisherImplementationTypeName = ClassName(publisherPackageName, publisherTypeElement.generatedClass("Impl"))
         val b = typeElement.extendsKeepAop(implementationName, resolver)
             .addSuperinterface(CommonClassNames.lifecycle)
             .addOriginatingKSFile(typeElement.containingFile!!)

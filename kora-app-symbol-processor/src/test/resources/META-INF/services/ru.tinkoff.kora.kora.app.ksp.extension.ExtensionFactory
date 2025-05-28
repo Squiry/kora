@@ -1,4 +1,2 @@
-ru.tinkoff.kora.kora.app.ksp.app.AppWithInterceptor$TestExtensionExtensionFactory
-ru.tinkoff.kora.kora.app.ksp.app.AppWithExtension$TestExtension1ExtensionFactory
 ru.tinkoff.kora.kora.app.ksp.app.AppWithExtension$TestExtension2ExtensionFactory
 ru.tinkoff.kora.kora.app.ksp.app.AppWithProcessorExtension$TestExtensionExtensionFactory

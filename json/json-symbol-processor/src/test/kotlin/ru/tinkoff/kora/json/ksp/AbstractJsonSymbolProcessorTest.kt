@@ -6,6 +6,7 @@ import org.assertj.core.api.Assertions
 import org.intellij.lang.annotations.Language
 import ru.tinkoff.kora.json.common.JsonReader
 import ru.tinkoff.kora.json.common.JsonWriter
+import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 import java.nio.charset.StandardCharsets
 
@@ -21,7 +22,7 @@ abstract class AbstractJsonSymbolProcessorTest : AbstractSymbolProcessorTest() {
     }
 
     protected open fun compile(@Language("kotlin") vararg sources: String) {
-        val compileResult = compile0(*sources)
+        val compileResult = compile0(listOf(JsonSymbolProcessorProvider(), KoraAppProcessorProvider()), *sources)
         if (compileResult.isFailed()) {
             throw compileResult.compilationException()
         }

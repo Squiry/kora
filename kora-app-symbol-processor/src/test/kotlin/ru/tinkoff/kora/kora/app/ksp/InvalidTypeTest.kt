@@ -8,37 +8,41 @@ class InvalidTypeTest : AbstractSymbolProcessorTest() {
     @Test
     fun testUnknownTypeComponent() {
         compile0(
+            listOf(KoraAppProcessorProvider()),
             """
-                @ru.tinkoff.kora.common.KoraApp
-                interface TestApp {
-                    @Root
-                    fun root() = Any()
-                    fun unknownTypeComponent(): some.unknown.type.Component {
-                        return null!!
-                    }
-                }
-                
-                """.trimIndent()
+                        @ru.tinkoff.kora.common.KoraApp
+                        interface TestApp {
+                            @Root
+                            fun root() = Any()
+                            fun unknownTypeComponent(): some.unknown.type.Component {
+                                return null!!
+                            }
+                        }
+                        
+                        """.trimIndent()
         )
 
+
         assertThat(compileResult.isFailed()).isTrue
-        assertThat(compileResult.messages).anyMatch { it.endsWith("TestApp.kt:13: Component type is not resolvable in the current round of processing") }
+        assertThat(compileResult.messages).anyMatch { it.endsWith("error: unresolved reference 'some'.") }
     }
 
     @Test
     fun testUnknownTypeDependency() {
         compile0(
+            listOf(KoraAppProcessorProvider()),
             """
-                @ru.tinkoff.kora.common.KoraApp
-                interface TestApp {
-                    @Root
-                    fun root(dependency: some.unknown.type.Component) = Any()
-                }
-                
-                """.trimIndent()
+                        @ru.tinkoff.kora.common.KoraApp
+                        interface TestApp {
+                            @Root
+                            fun root(dependency: some.unknown.type.Component) = Any()
+                        }
+                        
+                        """.trimIndent()
+
         )
 
         assertThat(compileResult.isFailed()).isTrue
-        assertThat(compileResult.messages).anyMatch { it.endsWith("TestApp.kt:12: Dependency type is not resolvable in the current round of processing: dependency") }
+        assertThat(compileResult.messages).anyMatch { it.endsWith("error: unresolved reference 'some'.") }
     }
 }

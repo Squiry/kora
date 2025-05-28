@@ -12,7 +12,7 @@ import ru.tinkoff.kora.ksp.common.KspCommonUtils.collectFinalSealedSubtypes
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.toTypeName
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 import ru.tinkoff.kora.ksp.common.visitClass
 import ru.tinkoff.kora.validation.symbol.processor.ValidTypes.CONTEXT_TYPE
 import ru.tinkoff.kora.validation.symbol.processor.ValidTypes.VALIDATOR_TYPE
@@ -25,7 +25,7 @@ class ValidatorGenerator(val codeGenerator: CodeGenerator) {
     private fun getValidatorSpec(meta: ValidatorMeta): ValidSymbolProcessor.ValidatorSpec {
         val parameterSpecs = ArrayList<ParameterSpec>()
         val typeName = meta.validator.contract
-        val validatorSpecBuilder = TypeSpec.classBuilder(meta.sourceDeclaration.generatedClassName("Validator"))
+        val validatorSpecBuilder = TypeSpec.classBuilder(meta.sourceDeclaration.generatedClass("Validator"))
             .addSuperinterface(typeName)
             .addAnnotation(
                 AnnotationSpec.builder(CommonClassNames.generated)
@@ -151,11 +151,13 @@ class ValidatorGenerator(val codeGenerator: CodeGenerator) {
             val factory = entry.key
             val fieldName = entry.value
             val validatorType = factory.validator()
-            val createParameters = factory.parameters.values.joinToString(", ") {
+            val createParameters = factory.parameters.values.joinToCode(", ") {
                 if (it is String) {
-                    CodeBlock.of("%S", it).toString()
+                    CodeBlock.of("%S", it)
+                } else if (it is KSClassDeclaration && it.parentDeclaration?.let { it is KSClassDeclaration && it.classKind == ClassKind.ENUM_CLASS } == true) {
+                    CodeBlock.of("%T.%L", (it.parentDeclaration as KSClassDeclaration).toClassName(), it.simpleName.asString())
                 } else {
-                    CodeBlock.of("%L", it).toString()
+                    CodeBlock.of("%L", it)
                 }
             }
 
@@ -291,7 +293,7 @@ class ValidatorGenerator(val codeGenerator: CodeGenerator) {
     private fun generateForSealed(symbol: KSClassDeclaration) {
         val typeName = symbol.asType(listOf()).toTypeName()
         val validatorTypeName = VALIDATOR_TYPE.parameterizedBy(typeName.copy(false))
-        val validatorSpecBuilder = TypeSpec.classBuilder(symbol.generatedClassName("Validator"))
+        val validatorSpecBuilder = TypeSpec.classBuilder(symbol.generatedClass("Validator"))
             .addSuperinterface(validatorTypeName)
             .generated(ValidatorGenerator::class)
         symbol.containingFile?.let(validatorSpecBuilder::addOriginatingKSFile)

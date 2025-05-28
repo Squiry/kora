@@ -5,7 +5,7 @@ tasks.findAll {
         it.kotlinOptions {
             jvmTarget = '17'
             javaParameters = true
-            freeCompilerArgs += '-Xjvm-default=all'
+            freeCompilerArgs += ['-Xjvm-default=all', '-Xcontext-parameters']
         }
     }
 }

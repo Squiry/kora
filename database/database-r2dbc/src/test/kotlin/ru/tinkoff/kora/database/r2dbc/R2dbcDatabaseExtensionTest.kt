@@ -95,7 +95,7 @@ class R2dbcDatabaseExtensionTest {
     companion object {
         private fun withDb(params: PostgresParams, consumer: suspend (R2dbcDatabase) -> Unit) {
             val config = R2dbcDatabaseConfig_Impl(
-                "r2dbc:postgres://%s:%d/%s".formatted(params.host, params.port, params.db),
+                "r2dbc:postgres://%s:%d/%s".format(params.host, params.port, params.db),
                 params.user,
                 params.password,
                 "test",

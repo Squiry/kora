@@ -1,12 +1,11 @@
 package ru.tinkoff.kora.validation.symbol.processor.aop
 
 import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.CodeBlock
-import com.squareup.kotlinpoet.MemberName
-import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toClassName
 import jakarta.annotation.Nonnull
 import ru.tinkoff.kora.aop.symbol.processor.KoraAspect
@@ -141,16 +140,15 @@ class ValidateMethodKoraAspect(private val resolver: Resolver) : KoraAspect {
             val constraintFactory = aspectContext.fieldFactory.constructorParam(factoryType, listOf())
             val constraintType = constraint.factory.validator().asKSType(resolver)
 
-            val parameters = CodeBlock.of(constraint.factory.parameters.values.asSequence()
-                .map {
-                    if (it is String) {
-                        CodeBlock.of("%S", it)
-                    } else {
-                        CodeBlock.of("%L", it)
-                    }
+            val parameters = constraint.factory.parameters.values.joinToCode(", ", "(", ")") {
+                if (it is String) {
+                    CodeBlock.of("%S", it)
+                } else if (it is KSClassDeclaration && it.parentDeclaration?.let { it is KSClassDeclaration && it.classKind == ClassKind.ENUM_CLASS } == true) {
+                    CodeBlock.of("%T.%L", (it.parentDeclaration as KSClassDeclaration).toClassName(), it.simpleName.asString())
+                } else {
+                    CodeBlock.of("%L", it)
                 }
-                .joinToString(", ", "(", ")"))
-
+            }
 
             val createCodeBlock = CodeBlock.builder()
                 .add("%N.create", constraintFactory)
@@ -276,15 +274,15 @@ class ValidateMethodKoraAspect(private val resolver: Resolver) : KoraAspect {
                 val constraintFactory = aspectContext.fieldFactory.constructorParam(factoryType, listOf())
                 val constraintType = constraint.factory.validator().asKSType(resolver)
 
-                val parameters = CodeBlock.of(constraint.factory.parameters.values.asSequence()
-                    .map {
-                        if (it is String) {
-                            CodeBlock.of("%S", it)
-                        } else {
-                            CodeBlock.of("%L", it)
-                        }
+                val parameters = constraint.factory.parameters.values.joinToCode(", ", "(", ")") {
+                    if (it is String) {
+                        CodeBlock.of("%S", it)
+                    } else if (it is KSClassDeclaration && it.parentDeclaration?.let { it is KSClassDeclaration && it.classKind == ClassKind.ENUM_CLASS } == true) {
+                        CodeBlock.of("%T.%L", (it.parentDeclaration as KSClassDeclaration).toClassName(), it.simpleName.asString())
+                    } else {
+                        CodeBlock.of("%L", it)
                     }
-                    .joinToString(", ", "(", ")"))
+                }
 
                 val createCodeBlock = CodeBlock.builder()
                     .add("%N.create", constraintFactory)

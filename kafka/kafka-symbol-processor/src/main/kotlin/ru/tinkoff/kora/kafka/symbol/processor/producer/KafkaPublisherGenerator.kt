@@ -30,7 +30,7 @@ import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.toTypeName
 import ru.tinkoff.kora.ksp.common.TagUtils.toTagAnnotation
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
@@ -39,7 +39,7 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
 
     fun generatePublisherModule(publisher: KSClassDeclaration, publishMethods: List<KSFunctionDeclaration>, publisherAnnotation: KSAnnotation, topicConfig: ClassName?, aopProxy: KSClassDeclaration?) {
         val packageName = publisher.packageName.asString()
-        val moduleName = publisher.generatedClassName("PublisherModule")
+        val moduleName = publisher.generatedClass("PublisherModule")
         val module = TypeSpec.interfaceBuilder(moduleName)
             .addOriginatingKSFile(publisher.containingFile!!)
             .addAnnotation(CommonClassNames.module)
@@ -59,7 +59,7 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
     }
 
     private fun buildTopicConfigMethod(publisher: KSClassDeclaration, publishMethods: List<KSFunctionDeclaration>, publisherAnnotation: KSAnnotation, configTypeName: ClassName): FunSpec {
-        val configName = publisher.generatedClassName("TopicConfig")
+        val configName = publisher.generatedClass("TopicConfig")
 
         val m = FunSpec.builder(configName.substring(1).replaceFirstChar { it.lowercaseChar() })
             .addModifiers(KModifier.PUBLIC)
@@ -104,7 +104,7 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
 
     private fun buildPublisherFactoryImpl(publisher: KSClassDeclaration): FunSpec {
         val packageName = publisher.packageName.asString()
-        val implementationName = publisher.generatedClassName("Impl")
+        val implementationName = publisher.generatedClass("Impl")
         val implementationTypeName = ClassName(packageName, implementationName)
 
         val functionType = Function::class.asTypeName().parameterizedBy(Properties::class.asClassName(), implementationTypeName)
@@ -121,7 +121,7 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
         val propertiesTag = AnnotationSpec.builder(CommonClassNames.tag).addMember("%T::class", publisher.toClassName()).build()
         val config = ParameterSpec.builder("config", KafkaClassNames.publisherConfig).addAnnotation(propertiesTag).build()
         val packageName = publisher.packageName.asString()
-        val implementationName = publisher.generatedClassName("Impl")
+        val implementationName = publisher.generatedClass("Impl")
         val implementationTypeName = ClassName(packageName, implementationName)
         val returnType = Function::class.asClassName().parameterizedBy(Properties::class.asClassName(), implementationTypeName)
 
@@ -196,7 +196,7 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
 
     fun generatePublisherImpl(classDeclaration: KSClassDeclaration, publishMethods: List<KSFunctionDeclaration>, topicConfig: ClassName?) {
         val packageName = classDeclaration.packageName.asString()
-        val implementationName = classDeclaration.generatedClassName("Impl")
+        val implementationName = classDeclaration.generatedClass("Impl")
 
         val b = classDeclaration.extendsKeepAop(implementationName, resolver)
             .generated(KafkaPublisherSymbolProcessor::class)
@@ -246,11 +246,12 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
                     .addStatement("return telemetry!!")
                     .build()
             )
-            .addFunction(FunSpec.builder("producer")
-                .addModifiers(KModifier.PUBLIC, KModifier.OVERRIDE)
-                .returns(KafkaClassNames.producer.parameterizedBy(BYTE_ARRAY, BYTE_ARRAY))
-                .addStatement("return this.delegate!!")
-                .build()
+            .addFunction(
+                FunSpec.builder("producer")
+                    .addModifiers(KModifier.PUBLIC, KModifier.OVERRIDE)
+                    .returns(KafkaClassNames.producer.parameterizedBy(BYTE_ARRAY, BYTE_ARRAY))
+                    .addStatement("return this.delegate!!")
+                    .build()
             )
 
         val constructorBuilder = FunSpec.constructorBuilder()
@@ -309,7 +310,13 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
     private val resume = MemberName("kotlin.coroutines", "resume")
     private val resumeWithException = MemberName("kotlin.coroutines", "resumeWithException")
 
-    private fun generatePublisherExecutableMethod(publishMethod: KSFunctionDeclaration, publishData: KafkaPublisherUtils.PublisherData, topicVariable: String, keyParserName: String?, valueParserName: String): FunSpec {
+    private fun generatePublisherExecutableMethod(
+        publishMethod: KSFunctionDeclaration,
+        publishData: KafkaPublisherUtils.PublisherData,
+        topicVariable: String,
+        keyParserName: String?,
+        valueParserName: String
+    ): FunSpec {
         val b = publishMethod.overridingKeepAop(resolver)
         if (publishData.recordVar != null) {
             val record = publishData.recordVar.name?.asString().toString()
@@ -374,7 +381,7 @@ class KafkaPublisherGenerator(val env: SymbolProcessorEnvironment, val resolver:
 
     fun generateConfig(producer: KSClassDeclaration, publishMethods: List<KSFunctionDeclaration>): ClassName? {
         val packageName = producer.packageName.asString()
-        val b = TypeSpec.classBuilder(producer.generatedClassName("TopicConfig"))
+        val b = TypeSpec.classBuilder(producer.generatedClass("TopicConfig"))
             .generated(KafkaPublisherSymbolProcessor::class)
             .addModifiers(KModifier.DATA)
             .addOriginatingKSFile(producer.containingFile!!)

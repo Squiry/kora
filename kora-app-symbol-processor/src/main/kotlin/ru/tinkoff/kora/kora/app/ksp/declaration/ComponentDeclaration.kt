@@ -2,17 +2,12 @@ package ru.tinkoff.kora.kora.app.ksp.declaration
 
 import com.google.devtools.ksp.closestClassDeclaration
 import com.google.devtools.ksp.isConstructor
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSTypeArgument
-import com.google.devtools.ksp.symbol.KSTypeParameter
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.*
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toClassName
-import ru.tinkoff.kora.kora.app.ksp.ProcessingContext
 import ru.tinkoff.kora.kora.app.ksp.extension.ExtensionResult
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.CommonClassNames
@@ -115,35 +110,37 @@ sealed interface ComponentDeclaration {
 
 
     companion object {
-        fun fromModule(ctx: ProcessingContext, module: ModuleDeclaration, method: KSFunctionDeclaration): FromModuleComponent {
+        context(resolver: Resolver)
+        fun fromModule(module: ModuleDeclaration, method: KSFunctionDeclaration): FromModuleComponent {
             // modules can be written in java so we better fix platform nullability
-            val type = method.returnType!!.resolve().fixPlatformType(ctx.resolver)
+            val type = method.returnType!!.resolve().fixPlatformType(resolver)
             if (type.isError) {
                 throw ProcessingErrorException("Component type is not resolvable in the current round of processing", method)
             }
             val tags = TagUtils.parseTagValue(method)
-            val parameterTypes = method.parameters.map { it.type.resolve().fixPlatformType(ctx.resolver) }
+            val parameterTypes = method.parameters.map { it.type.resolve().fixPlatformType(resolver) }
             val typeParameters = method.typeParameters.map {
-                val t = it.bounds.firstOrNull()?.resolve()?.fixPlatformType(ctx.resolver) ?: ctx.resolver.builtIns.anyType
+                val t = it.bounds.firstOrNull()?.resolve()?.fixPlatformType(resolver) ?: resolver.builtIns.anyType
 
-                ctx.resolver.getTypeArgument(
-                    ctx.resolver.createKSTypeReferenceFromKSType(t),
+                resolver.getTypeArgument(
+                    resolver.createKSTypeReferenceFromKSType(t),
                     it.variance
                 )
             }
             return FromModuleComponent(type, module, tags, method, parameterTypes, typeParameters)
         }
 
-        fun fromAnnotated(ctx: ProcessingContext, classDeclaration: KSClassDeclaration): AnnotatedComponent {
+        context(resolver: Resolver)
+        fun fromAnnotated(classDeclaration: KSClassDeclaration): AnnotatedComponent {
             val constructor = classDeclaration.primaryConstructor
             if (constructor == null) {
                 throw ProcessingErrorException("@Component annotated class should have primary constructor", classDeclaration)
             }
             val typeParameters = classDeclaration.typeParameters.map {
-                val t = it.bounds.firstOrNull()?.resolve() ?: ctx.resolver.builtIns.anyType
+                val t = it.bounds.firstOrNull()?.resolve() ?: resolver.builtIns.anyType
 
-                ctx.resolver.getTypeArgument(
-                    ctx.resolver.createKSTypeReferenceFromKSType(t),
+                resolver.getTypeArgument(
+                    resolver.createKSTypeReferenceFromKSType(t),
                     it.variance
                 )
             }
@@ -154,7 +151,8 @@ sealed interface ComponentDeclaration {
             return AnnotatedComponent(type, classDeclaration, tags, constructor, parameterTypes, typeParameters)
         }
 
-        fun fromDependency(@Suppress("UNUSED_PARAMETER") ctx: ProcessingContext, classDeclaration: KSClassDeclaration, type: KSType): DiscoveredAsDependencyComponent {
+        @Suppress("UNUSED_PARAMETER")
+        fun fromDependency(classDeclaration: KSClassDeclaration, type: KSType): DiscoveredAsDependencyComponent {
             val constructor = classDeclaration.primaryConstructor
             if (constructor == null) {
                 throw ProcessingErrorException("No primary constructor to parse component for: $classDeclaration", classDeclaration)
@@ -167,10 +165,11 @@ sealed interface ComponentDeclaration {
             return DiscoveredAsDependencyComponent(type, classDeclaration, constructor, tags)
         }
 
-        fun fromExtension(ctx: ProcessingContext, extensionResult: ExtensionResult.GeneratedResult): FromExtensionComponent {
+        context(resolver: Resolver)
+        fun fromExtension(extensionResult: ExtensionResult.GeneratedResult): FromExtensionComponent {
             val sourceMethod = extensionResult.constructor
             val sourceType = extensionResult.type
-            val parameterTypes = sourceType.parameterTypes.map { it!!.fixPlatformType(ctx.resolver) }
+            val parameterTypes = sourceType.parameterTypes.map { it!!.fixPlatformType(resolver) }
             val parameterTags = sourceMethod.parameters.map { it.parseTags() }
             val type = sourceType.returnType!!
             if (type.isError) {

@@ -1,25 +1,26 @@
 package ru.tinkoff.kora.database.symbol.processor
 
-import kotlin.reflect.KClass
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import ru.tinkoff.kora.common.Tag
 import ru.tinkoff.kora.database.jdbc.JdbcRepository
 import ru.tinkoff.kora.database.symbol.processor.jdbc.AbstractJdbcRepositoryTest
+import kotlin.reflect.KClass
 
 class RepositoryTagPropagationTest : AbstractJdbcRepositoryTest() {
 
     @Test
     fun tagsFromInterfaceArePropagatedToImpl() {
         compile0(
+            processors,
             """
-            @Repository
-            @Tag(value = [TestRepository::class, JdbcRepository::class, Int::class])
-            interface TestRepository : JdbcRepository {
-                @Query("SELECT 1;")
-                fun select1()
-            }
-            """.trimIndent(),
+                    @Repository
+                    @Tag(value = [TestRepository::class, JdbcRepository::class, Int::class])
+                    interface TestRepository : JdbcRepository {
+                        @Query("SELECT 1;")
+                        fun select1()
+                    }
+                    """.trimIndent()
         )
 
         compileResult.assertSuccess()

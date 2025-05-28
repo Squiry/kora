@@ -3,6 +3,7 @@ package ru.tinkoff.grpc.client.ksp
 import org.assertj.core.api.Assertions
 import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Test
+import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 import ru.tinkoff.kora.ksp.common.GraphUtil.toGraph
 import java.util.*
@@ -25,7 +26,7 @@ class GrpcClientExtensionTest : AbstractSymbolProcessorTest() {
               }
             }
             """.trimIndent()
-        super.compile0(*patchedSources)
+        compile0(listOf(GrpcClientStubForSymbolProcessorProvider(), KoraAppProcessorProvider()), *patchedSources)
         compileResult.assertSuccess()
         loadClass("TestAppGraph").toGraph().use { g ->
             /*

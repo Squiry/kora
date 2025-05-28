@@ -8,14 +8,17 @@ class AbstractClassTest : AbstractJdbcRepositoryTest() {
 
     @Test
     fun testAbstractClassRepository() {
-        compile0("""
-            @Repository
-            abstract class AbstractClassRepository(private val field: String?) : JdbcRepository {
-                @Query("INSERT INTO table(value) VALUES (:value)")
-                abstract fun abstractMethod(value: String?)
-                fun nonAbstractMethod() {}
-            }
-        """.trimIndent())
+        compile0(
+            processors,
+            """
+                    @Repository
+                    abstract class AbstractClassRepository(private val field: String?) : JdbcRepository {
+                        @Query("INSERT INTO table(value) VALUES (:value)")
+                        abstract fun abstractMethod(value: String?)
+                        fun nonAbstractMethod() {}
+                    }
+                """.trimIndent()
+        )
 
         compileResult.assertSuccess()
         assertThat(compileResult.loadClass("\$AbstractClassRepository_Impl")).isFinal
@@ -23,23 +26,26 @@ class AbstractClassTest : AbstractJdbcRepositoryTest() {
 
     @Test
     fun testAbstractClassRepositoryExtension() {
-        compile0("""
-            @Repository
-            abstract class AbstractClassRepository : JdbcRepository {
-                @Query("INSERT INTO table(value) VALUES (:value)")
-                abstract fun abstractMethod(value: String?)
-            }
-        """.trimIndent(), """
-                    @KoraApp
-                    interface TestApp {
-                        fun factory() : ru.tinkoff.kora.database.jdbc.JdbcConnectionFactory {
-                          return org.mockito.Mockito.mock(ru.tinkoff.kora.database.jdbc.JdbcConnectionFactory::class.java)
-                        }
-                        
-                        @Root
-                        fun root(repository: AbstractClassRepository) : String = "test"
+        compile0(
+            processors,
+            """
+                    @Repository
+                    abstract class AbstractClassRepository : JdbcRepository {
+                        @Query("INSERT INTO table(value) VALUES (:value)")
+                        abstract fun abstractMethod(value: String?)
                     }
-                """.trimIndent())
+                """.trimIndent(), """
+                            @KoraApp
+                            interface TestApp {
+                                fun factory() : ru.tinkoff.kora.database.jdbc.JdbcConnectionFactory {
+                                  return org.mockito.Mockito.mock(ru.tinkoff.kora.database.jdbc.JdbcConnectionFactory::class.java)
+                                }
+                                
+                                @Root
+                                fun root(repository: AbstractClassRepository) : String = "test"
+                            }
+                        """.trimIndent()
+        )
 
         compileResult.assertSuccess()
         assertThat(compileResult.loadClass("\$AbstractClassRepository_Impl")).isFinal

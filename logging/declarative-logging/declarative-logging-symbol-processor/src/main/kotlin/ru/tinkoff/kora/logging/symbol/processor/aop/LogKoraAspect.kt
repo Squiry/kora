@@ -1,8 +1,8 @@
 package ru.tinkoff.kora.logging.symbol.processor.aop
 
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.MemberName
@@ -359,8 +359,8 @@ class LogKoraAspect : KoraAspect {
 
     private fun KSAnnotated.parseLogLevel(annotation: ClassName): Level? {
         return this.findAnnotation(annotation)
-            ?.findValue<KSType>("value")
-            ?.declaration?.toString() // ugly enum handling
+            ?.findValue<KSClassDeclaration>("value")
+            ?.simpleName?.asString() // ugly enum handling
             ?.let { Level.valueOf(it) }
     }
 

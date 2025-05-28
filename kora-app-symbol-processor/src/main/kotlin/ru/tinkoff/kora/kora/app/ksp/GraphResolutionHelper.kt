@@ -13,8 +13,9 @@ import ru.tinkoff.kora.ksp.common.TagUtils
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
 
 object GraphResolutionHelper {
-    fun findDependency(ctx: ProcessingContext, forDeclaration: ComponentDeclaration, resolvedComponents: List<ResolvedComponent>, dependencyClaim: DependencyClaim): SingleDependency? {
-        val dependencies = findDependencies(ctx, resolvedComponents, dependencyClaim)
+    context(ctx: ProcessingContext)
+    fun findDependency(forDeclaration: ComponentDeclaration, dependencyClaim: DependencyClaim): SingleDependency? {
+        val dependencies = findDependencies(dependencyClaim)
         if (dependencies.size == 1) {
             return dependencies[0]
         }
@@ -28,9 +29,10 @@ object GraphResolutionHelper {
         )
     }
 
-    fun findDependencies(ctx: ProcessingContext, resolvedComponents: List<ResolvedComponent>, dependencyClaim: DependencyClaim): List<SingleDependency> {
+    context(ctx: ProcessingContext)
+    fun findDependencies(dependencyClaim: DependencyClaim): List<SingleDependency> {
         val result = ArrayList<SingleDependency>(4)
-        for (resolvedComponent in resolvedComponents) {
+        for (resolvedComponent in ctx.components) {
             if (!dependencyClaim.tagsMatches(resolvedComponent.tags)) {
                 continue
             }
@@ -53,7 +55,8 @@ object GraphResolutionHelper {
         return result
     }
 
-    fun findFinalDependency(ctx: ProcessingContext, dependencyClaim: DependencyClaim): ComponentDeclaration? {
+    context(ctx: ProcessingContext)
+    fun findFinalDependency(dependencyClaim: DependencyClaim): ComponentDeclaration? {
         val declaration = dependencyClaim.type.declaration
         if (declaration !is KSClassDeclaration) {
             return null
@@ -69,7 +72,7 @@ object GraphResolutionHelper {
         }
         val tags = TagUtils.parseTagValue(declaration)
         if (dependencyClaim.tagsMatches(tags)) {
-            return ComponentDeclaration.fromDependency(ctx, declaration, dependencyClaim.type)
+            return ComponentDeclaration.fromDependency(declaration, dependencyClaim.type)
         }
         return null
     }
@@ -105,13 +108,9 @@ object GraphResolutionHelper {
     }
 
 
-    fun findDependencyDeclarationFromTemplate(
-        ctx: ProcessingContext,
-        forDeclaration: ComponentDeclaration,
-        templateDeclarations: List<ComponentDeclaration>,
-        dependencyClaim: DependencyClaim
-    ): ComponentDeclaration? {
-        val result = findDependencyDeclarationsFromTemplate(ctx, forDeclaration, templateDeclarations, dependencyClaim)
+    context(ctx: ProcessingContext)
+    fun findDependencyDeclarationFromTemplate(forDeclaration: ComponentDeclaration, dependencyClaim: DependencyClaim): ComponentDeclaration? {
+        val result = findDependencyDeclarationsFromTemplate(dependencyClaim)
         if (result.isEmpty()) {
             return null
         }
@@ -127,15 +126,10 @@ object GraphResolutionHelper {
     }
 
 
-    fun findDependencyDeclarationsFromTemplate(
-        ctx: ProcessingContext,
-        @Suppress("UNUSED_PARAMETER")
-        forDeclaration: ComponentDeclaration,
-        templateDeclarations: List<ComponentDeclaration>,
-        dependencyClaim: DependencyClaim
-    ): List<ComponentDeclaration> {
+    context(ctx: ProcessingContext)
+    fun findDependencyDeclarationsFromTemplate(dependencyClaim: DependencyClaim): List<ComponentDeclaration> {
         val result = arrayListOf<ComponentDeclaration>()
-        for (template in templateDeclarations) {
+        for (template in ctx.templateDeclarations) {
             if (!dependencyClaim.tagsMatches(template.tags)) {
                 continue
             }
@@ -237,14 +231,16 @@ object GraphResolutionHelper {
                     for (methodParameterType in template.methodParameterTypes) {
                         realParams.add(ComponentTemplateHelper.replace(ctx.resolver, methodParameterType, map)!!)
                     }
-                    result.add(ComponentDeclaration.FromExtensionComponent(
-                        realReturnType,
-                        sourceMethod,
-                        realParams,
-                        template.methodParameterTags,
-                        template.tags,
-                        template.generator
-                    ))
+                    result.add(
+                        ComponentDeclaration.FromExtensionComponent(
+                            realReturnType,
+                            sourceMethod,
+                            realParams,
+                            template.methodParameterTags,
+                            template.tags,
+                            template.generator
+                        )
+                    )
                 }
 
                 is ComponentDeclaration.DiscoveredAsDependencyComponent -> throw IllegalStateException()
@@ -269,15 +265,11 @@ object GraphResolutionHelper {
     }
 
 
-    fun findDependencyDeclaration(
-        ctx: ProcessingContext,
-        forDeclaration: ComponentDeclaration,
-        sourceDeclarations: List<ComponentDeclaration>,
-        dependencyClaim: DependencyClaim
-    ): ComponentDeclaration? {
+    context(ctx: ProcessingContext)
+    fun findDependencyDeclaration(forDeclaration: ComponentDeclaration, dependencyClaim: DependencyClaim): ComponentDeclaration? {
         val claimType = dependencyClaim.claimType
         assert(claimType !in listOf(DependencyClaim.DependencyClaimType.ALL, DependencyClaim.DependencyClaimType.ALL_OF_PROMISE, DependencyClaim.DependencyClaimType.ALL_OF_VALUE))
-        val declarations = findDependencyDeclarations(ctx, sourceDeclarations, dependencyClaim)
+        val declarations = findDependencyDeclarations(dependencyClaim)
         if (declarations.size == 1) {
             return declarations[0]
         }
@@ -303,9 +295,10 @@ object GraphResolutionHelper {
         )
     }
 
-    fun findDependencyDeclarations(ctx: ProcessingContext, sourceDeclarations: List<ComponentDeclaration>, dependencyClaim: DependencyClaim): List<ComponentDeclaration> {
+    context(ctx: ProcessingContext)
+    fun findDependencyDeclarations(dependencyClaim: DependencyClaim): List<ComponentDeclaration> {
         val result = mutableListOf<ComponentDeclaration>()
-        for (sourceDeclaration in sourceDeclarations) {
+        for (sourceDeclaration in ctx.sourceDeclarations) {
             if (!dependencyClaim.tagsMatches(sourceDeclaration.tags)) {
                 continue
             }
@@ -316,9 +309,10 @@ object GraphResolutionHelper {
         return result
     }
 
-    fun findInterceptorDeclarations(ctx: ProcessingContext, sourceDeclarations: List<ComponentDeclaration>, type: KSType): MutableList<ComponentDeclaration> {
+    context(ctx: ProcessingContext)
+    fun findInterceptorDeclarations(type: KSType): MutableList<ComponentDeclaration> {
         val result = mutableListOf<ComponentDeclaration>()
-        for (sourceDeclaration in sourceDeclarations) {
+        for (sourceDeclaration in ctx.sourceDeclarations) {
             if (ctx.serviceTypesHelper.isInterceptorFor(sourceDeclaration.type, type)) {
                 result.add(sourceDeclaration)
             }

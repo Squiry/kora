@@ -1,8 +1,8 @@
 package ru.tinkoff.kora.kafka.symbol.processor.consumer
 
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.processing.Resolver
+import com.google.devtools.ksp.symbol.*
 import ru.tinkoff.kora.kafka.symbol.processor.KafkaUtils.isAnyException
 import ru.tinkoff.kora.kafka.symbol.processor.KafkaUtils.isConsumer
 import ru.tinkoff.kora.kafka.symbol.processor.KafkaUtils.isConsumerRecord
@@ -31,13 +31,22 @@ sealed interface ConsumerParameter {
     data class Unknown(override val parameter: KSValueParameter) : ConsumerParameter
 
     companion object {
+        context(r: Resolver)
         fun parseParameters(function: KSFunctionDeclaration) = function.parameters.map {
             val type = it.type.resolve()
+            fun KSTypeArgument.resolveGenericSafe(): KSType {
+                if (this.variance == Variance.STAR) {
+                    require(this.type == null)
+                    ByteArray::class
+                    return r.getClassDeclarationByName<ByteArray>()!!.asType(listOf())
+                }
+                return this.type!!.resolve()
+            }
             when {
-                type.isConsumerRecord() -> Record(it, type.arguments[0].type!!.resolve(), type.arguments[1].type!!.resolve())
-                type.isConsumerRecords() -> Records(it, type.arguments[0].type!!.resolve(), type.arguments[1].type!!.resolve())
-                type.isConsumer() -> Consumer(it, type.arguments[0].type!!.resolve(), type.arguments[1].type!!.resolve())
-                type.isRecordsTelemetry() -> RecordsTelemetry(it, type.arguments[0].type!!.resolve(), type.arguments[1].type!!.resolve())
+                type.isConsumerRecord() -> Record(it, type.arguments[0].resolveGenericSafe(), type.arguments[1].type!!.resolve())
+                type.isConsumerRecords() -> Records(it, type.arguments[0].resolveGenericSafe(), type.arguments[1].resolveGenericSafe())
+                type.isConsumer() -> Consumer(it, type.arguments[0].resolveGenericSafe(), type.arguments[1].resolveGenericSafe())
+                type.isRecordsTelemetry() -> RecordsTelemetry(it, type.arguments[0].resolveGenericSafe(), type.arguments[1].resolveGenericSafe())
                 type.isKeyDeserializationException() -> KeyDeserializationException(it)
                 type.isValueDeserializationException() -> ValueDeserializationException(it)
                 type.isAnyException() -> Exception(it)

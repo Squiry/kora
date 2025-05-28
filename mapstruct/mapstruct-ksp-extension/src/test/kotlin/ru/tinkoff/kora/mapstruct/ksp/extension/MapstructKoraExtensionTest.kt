@@ -1,10 +1,9 @@
 package ru.tinkoff.kora.mapstruct.ksp.extension
 
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 import ru.tinkoff.kora.ksp.common.GraphUtil
 import ru.tinkoff.kora.ksp.common.GraphUtil.toGraph
@@ -36,7 +35,7 @@ class MapstructKoraExtensionTest : AbstractSymbolProcessorTest() {
             """.trimIndent()
 
         patchedSources[sources.size] = main
-        super.compile0(*patchedSources)
+        compile0(listOf(KoraAppProcessorProvider()), *patchedSources)
         compileResult.assertSuccess()
         return loadClass("TestAppGraph").toGraph()
     }

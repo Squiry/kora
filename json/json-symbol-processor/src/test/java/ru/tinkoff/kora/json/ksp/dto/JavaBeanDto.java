@@ -1,5 +1,8 @@
 package ru.tinkoff.kora.json.ksp.dto;
 
+import ru.tinkoff.kora.json.common.annotation.Json;
+
+@Json
 public class JavaBeanDto {
     private java.lang.String text;
 

@@ -12,12 +12,13 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import ru.tinkoff.kora.common.Component
 import ru.tinkoff.kora.common.Module
-import ru.tinkoff.kora.ksp.common.*
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findValue
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findValueNoDefault
+import ru.tinkoff.kora.ksp.common.BaseSymbolProcessor
 import ru.tinkoff.kora.ksp.common.CommonAopUtils.extendsKeepAop
 import ru.tinkoff.kora.ksp.common.CommonAopUtils.overridingKeepAop
+import ru.tinkoff.kora.ksp.common.CommonClassNames
 import ru.tinkoff.kora.ksp.common.CommonClassNames.isCollection
 import ru.tinkoff.kora.ksp.common.CommonClassNames.isMap
 import ru.tinkoff.kora.ksp.common.CommonClassNames.isVoid
@@ -27,6 +28,8 @@ import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.toTypeName
 import ru.tinkoff.kora.ksp.common.TagUtils.addTag
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
+import ru.tinkoff.kora.ksp.common.generatedClass
+import ru.tinkoff.kora.ksp.common.makeTagAnnotationSpec
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.concurrent.ExecutorService
@@ -115,6 +118,8 @@ class S3ClientSymbolProcessor(
                     .addType(configSpec)
                     .build()
                 configImplSpec.writeTo(codeGenerator = environment.codeGenerator, aggregating = false)
+            } catch (e: ProcessingErrorException) {
+                e.printError(environment.logger)
             } catch (e: IOException) {
                 throw IllegalStateException(e)
             }
@@ -124,7 +129,7 @@ class S3ClientSymbolProcessor(
     }
 
     private fun generateClient(s3client: KSClassDeclaration, resolver: Resolver): TypeSpec {
-        val implSpecBuilder: TypeSpec.Builder = s3client.extendsKeepAop(s3client.generatedClassName("Impl"), resolver)
+        val implSpecBuilder: TypeSpec.Builder = s3client.extendsKeepAop(s3client.generatedClass("Impl"), resolver)
             .generated(S3ClientSymbolProcessor::class)
             .addAnnotation(Component::class)
 

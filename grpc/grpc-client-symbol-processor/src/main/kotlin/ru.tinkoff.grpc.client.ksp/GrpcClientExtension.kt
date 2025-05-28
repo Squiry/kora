@@ -3,7 +3,6 @@ package ru.tinkoff.grpc.client.ksp
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.getDeclaredFunctions
-import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -28,7 +27,6 @@ import ru.tinkoff.kora.ksp.common.KspCommonUtils.getClassDeclarationByName
 class GrpcClientExtension(
     val resolver: Resolver,
     val kspLogger: KSPLogger,
-    val codeGenerator: CodeGenerator,
     val abstractStub: KSClassDeclaration?,
     val abstractCoroutineStub: KSClassDeclaration?) : KoraExtension {
 

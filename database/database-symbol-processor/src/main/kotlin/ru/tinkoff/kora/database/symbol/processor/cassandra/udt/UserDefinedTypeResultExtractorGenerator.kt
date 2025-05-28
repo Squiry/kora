@@ -11,7 +11,7 @@ import ru.tinkoff.kora.database.symbol.processor.cassandra.CassandraNativeTypes
 import ru.tinkoff.kora.database.symbol.processor.cassandra.CassandraTypes
 import ru.tinkoff.kora.database.symbol.processor.model.DbEntity
 import ru.tinkoff.kora.ksp.common.KotlinPoetUtils.controlFlow
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 
 class UserDefinedTypeResultExtractorGenerator(private val environment: SymbolProcessorEnvironment) {
     fun generate(classDeclaration: KSClassDeclaration) {
@@ -22,7 +22,7 @@ class UserDefinedTypeResultExtractorGenerator(private val environment: SymbolPro
     private fun generateRowColumnMapper(classDeclaration: KSClassDeclaration) {
         val type = classDeclaration.asType(listOf())
         val typeName = type.toTypeName().copy(false)
-        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClassName("CassandraRowColumnMapper"))
+        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClass("CassandraRowColumnMapper"))
             .addModifiers(KModifier.PUBLIC, KModifier.FINAL)
             .addSuperinterface(CassandraTypes.rowColumnMapper.parameterizedBy(typeName))
         classDeclaration.containingFile?.let { typeSpec.addOriginatingKSFile(it) }
@@ -54,7 +54,7 @@ class UserDefinedTypeResultExtractorGenerator(private val environment: SymbolPro
         val type = classDeclaration.asType(listOf())
         val typeName = type.toTypeName().copy(false)
         val listTypeName = LIST.parameterizedBy(typeName).copy(false)
-        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClassName("List_CassandraRowColumnMapper"))
+        val typeSpec = TypeSpec.classBuilder(classDeclaration.generatedClass("List_CassandraRowColumnMapper"))
             .addModifiers(KModifier.PUBLIC, KModifier.FINAL)
             .addSuperinterface(CassandraTypes.rowColumnMapper.parameterizedBy(listTypeName))
         classDeclaration.containingFile?.let { typeSpec.addOriginatingKSFile(it) }

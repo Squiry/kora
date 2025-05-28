@@ -9,13 +9,12 @@ import ru.tinkoff.kora.application.graph.ApplicationGraphDraw
 import ru.tinkoff.kora.common.Tag
 import ru.tinkoff.kora.database.symbol.processor.app.TestKoraApp
 import ru.tinkoff.kora.database.symbol.processor.app.TestKoraAppTagged
+import ru.tinkoff.kora.database.symbol.processor.jdbc.AbstractJdbcRepositoryTest
 import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
+import ru.tinkoff.kora.ksp.common.GraphUtil.toGraph
 import ru.tinkoff.kora.ksp.common.symbolProcess
 import java.lang.reflect.Constructor
-import java.util.function.Supplier
 import kotlin.reflect.full.isSubclassOf
-import ru.tinkoff.kora.database.symbol.processor.jdbc.AbstractJdbcRepositoryTest
-import ru.tinkoff.kora.ksp.common.GraphUtil.toGraph
 
 class ExtensionTest : AbstractJdbcRepositoryTest() {
 
@@ -23,8 +22,8 @@ class ExtensionTest : AbstractJdbcRepositoryTest() {
     fun test() {
         val classLoader = symbolProcess(TestKoraApp::class, KoraAppProcessorProvider(), RepositorySymbolProcessorProvider())
         val clazz = classLoader.loadClass(TestKoraApp::class.qualifiedName + "Graph")
-        val constructors = clazz.constructors as Array<Constructor<out Supplier<out ApplicationGraphDraw>>>
-        val graphDraw: ApplicationGraphDraw = constructors[0].newInstance().get()
+        val constructors = clazz.constructors as Array<Constructor<out Function0<out ApplicationGraphDraw>>>
+        val graphDraw: ApplicationGraphDraw = constructors[0].newInstance()()
         Assertions.assertThat(graphDraw).isNotNull
         Assertions.assertThat(graphDraw.size()).isEqualTo(3)
     }
@@ -46,32 +45,33 @@ class ExtensionTest : AbstractJdbcRepositoryTest() {
     @Test
     fun testTaggedRepo() {
         val result = compile0(
+            processors,
             """
-            import org.mockito.Mockito
-
-            @KoraApp
-            interface Application {
-                @Root
-                fun testRoot(
-                    @Tag(value = [TestRepository::class, JdbcRepository::class, Int::class])
-                    repo: TestRepository
-                ) = repo.test()
+                    import org.mockito.Mockito
         
-                fun jdbcQueryExecutorAccessor(): JdbcConnectionFactory {
-                    return Mockito.mock(JdbcConnectionFactory::class.java)
-                }
-            }
-            """.trimIndent(),
-            """
-            @Repository
-            @Tag(value = [TestRepository::class, JdbcRepository::class, Int::class])
-            interface TestRepository : JdbcRepository {
-                @Query("SELECT 1;")
-                fun select1()
+                    @KoraApp
+                    interface Application {
+                        @Root
+                        fun testRoot(
+                            @Tag(value = [TestRepository::class, JdbcRepository::class, Int::class])
+                            repo: TestRepository
+                        ) = repo.test()
                 
-                fun test() = "i'm in test repo"
-            }
-            """.trimIndent(),
+                        fun jdbcQueryExecutorAccessor(): JdbcConnectionFactory {
+                            return Mockito.mock(JdbcConnectionFactory::class.java)
+                        }
+                    }
+                    """.trimIndent(),
+            """
+                    @Repository
+                    @Tag(value = [TestRepository::class, JdbcRepository::class, Int::class])
+                    interface TestRepository : JdbcRepository {
+                        @Query("SELECT 1;")
+                        fun select1()
+                        
+                        fun test() = "i'm in test repo"
+                    }
+                    """.trimIndent()
         )
 
         result.assertSuccess()

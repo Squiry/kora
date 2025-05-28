@@ -20,6 +20,7 @@ import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
 import kotlin.reflect.KClass
 
 object KspCommonUtils {
+    fun Resolver.getSymbolsWithAnnotation(cn: ClassName) = this.getSymbolsWithAnnotation(cn.canonicalName)
 
     fun KSAnnotated.findRepeatableAnnotation(annotationName: ClassName, containerName: ClassName): List<KSAnnotation> {
         val annotations = this.findAnnotations(annotationName)
@@ -343,15 +344,6 @@ fun KSDeclaration.generatedClass(generatedType: ClassName): String {
     return this.getOuterClassesAsPrefix() + this.simpleName.asString() + "_" + generatedType.simpleName
 }
 
-fun KSClassDeclaration.generatedClassName(postfix: String): String {
-    val prefix = StringBuilder("$")
-    var parent = this.parent
-    while (parent != null && parent is KSClassDeclaration) {
-        prefix.insert(1, parent.simpleName.asString() + "_")
-        parent = parent.parent
-    }
-    return prefix.toString() + this.simpleName.asString() + "_" + postfix
-}
 
 fun <T> measured(name: String, thunk: () -> T): T {
     val start = System.currentTimeMillis()

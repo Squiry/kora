@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 
 class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
+    val processors = listOf(S3ClientSymbolProcessorProvider())
 
     override fun commonImports(): String {
         return super.commonImports() + """
@@ -21,15 +22,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientConfig() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get
-                suspend fun get(key: String): S3ObjectMeta
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get
+                        suspend fun get(key: String): S3ObjectMeta
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -42,15 +45,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
     // Get
     @Test
     fun clientGetMeta() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get
-                suspend fun get(key: String): S3ObjectMeta
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get
+                        suspend fun get(key: String): S3ObjectMeta
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -59,15 +64,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetObject() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get
-                suspend fun get(key: String): S3Object
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get
+                        suspend fun get(key: String): S3Object
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -76,15 +83,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetManyMetas() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get
-                suspend fun get(keys: Collection<String>): List<S3ObjectMeta>
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get
+                        suspend fun get(keys: Collection<String>): List<S3ObjectMeta>
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -93,15 +102,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetManyObjects() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get
-                suspend fun get(key: List<String>): List<S3Object>
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get
+                        suspend fun get(key: List<String>): List<S3Object>
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -110,15 +121,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetKeyConcat() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get("{key1}-{key2}")
-                suspend fun get(key1: String, key2: Long): S3ObjectMeta
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get("{key1}-{key2}")
+                        suspend fun get(key1: String, key2: Long): S3ObjectMeta
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -127,30 +140,34 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetKeyMissing() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get("{key1}-{key12345}")
-                suspend fun get(key1: String): S3ObjectMeta
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get("{key1}-{key12345}")
+                        suspend fun get(key1: String): S3ObjectMeta
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
 
     @Test
     fun clientGetKeyConst() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get("const-key")
-                suspend fun get(): S3ObjectMeta
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get("const-key")
+                        suspend fun get(): S3ObjectMeta
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -159,15 +176,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetKeyUnused() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get("const-key")
-                suspend fun get(key: String): S3ObjectMeta
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get("const-key")
+                        suspend fun get(key: String): S3ObjectMeta
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
@@ -175,15 +194,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
     // List
     @Test
     fun clientListMeta() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List
-                suspend fun list(): S3ObjectMetaList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List
+                        suspend fun list(): S3ObjectMetaList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -192,15 +213,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListMetaWithPrefix() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List
-                suspend fun list(prefix: String): S3ObjectMetaList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List
+                        suspend fun list(prefix: String): S3ObjectMetaList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -209,15 +232,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListObjectsWithPrefix() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List
-                suspend fun list(prefix: String): S3ObjectList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List
+                        suspend fun list(prefix: String): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -226,15 +251,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListLimit() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List(limit = 100)
-                suspend fun list(prefix: String): S3ObjectList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List(limit = 100)
+                        suspend fun list(prefix: String): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -243,15 +270,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListKeyConcat() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List("{key1}-{key2}")
-                suspend fun list(key1: String, key2: Long): S3ObjectList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List("{key1}-{key2}")
+                        suspend fun list(key1: String, key2: Long): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -260,15 +289,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListKeyAndDelimiter() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List(value = "some/path/to/{key1}/object", delimiter = "/")
-                suspend fun list(key1: String): S3ObjectList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List(value = "some/path/to/{key1}/object", delimiter = "/")
+                        suspend fun list(key1: String): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -277,30 +308,34 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListKeyMissing() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List("{key1}-{key12345}")
-                suspend fun list(key1: String): S3ObjectList
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List("{key1}-{key12345}")
+                        suspend fun list(key1: String): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
 
     @Test
     fun clientListKeyConst() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List("const-key")
-                suspend fun list(): S3ObjectList
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List("const-key")
+                        suspend fun list(): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -309,15 +344,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListKeyUnused() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List("const-key")
-                suspend fun list(key: String): S3ObjectList
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List("const-key")
+                        suspend fun list(key: String): S3ObjectList
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
@@ -325,15 +362,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
     // Delete
     @Test
     fun clientDelete() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete
-                suspend fun delete(key: String)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete
+                        suspend fun delete(key: String)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -342,15 +381,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientDeleteKeyConcat() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete("{key1}-{key2}")
-                suspend fun delete(key1: String, key2: Long)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete("{key1}-{key2}")
+                        suspend fun delete(key1: String, key2: Long)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -359,30 +400,34 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientDeleteKeyMissing() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete("{key1}-{key12345}")
-                suspend fun delete(key1: String)
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete("{key1}-{key12345}")
+                        suspend fun delete(key1: String)
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
 
     @Test
     fun clientDeleteKeyConst() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete("const-key")
-                suspend fun delete()
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete("const-key")
+                        suspend fun delete()
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -391,15 +436,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientDeleteKeyUnused() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete("const-key")
-                suspend fun delete(key: String)
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete("const-key")
+                        suspend fun delete(key: String)
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
@@ -407,15 +454,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
     // Deletes
     @Test
     fun clientDeletes() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete
-                suspend fun delete(key: List<String>)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete
+                        suspend fun delete(key: List<String>)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -425,15 +474,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
     // Put
     @Test
     fun clientPutBody() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put
-                suspend fun put(key: String, value: S3Body)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put
+                        suspend fun put(key: String, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -442,15 +493,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBodyReturnUpload() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put
-                suspend fun put(key: String, value: S3Body): S3ObjectUpload
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put
+                        suspend fun put(key: String, value: S3Body): S3ObjectUpload
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -459,15 +512,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBytes() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put
-                suspend fun put(key: String, value: ByteArray)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put
+                        suspend fun put(key: String, value: ByteArray)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -476,15 +531,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBuffer() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put
-                suspend fun put(key: String, value: ByteBuffer)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put
+                        suspend fun put(key: String, value: ByteBuffer)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -493,15 +550,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBodyAndType() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put(type = "type")
-                suspend fun put(key: String, value: S3Body)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put(type = "type")
+                        suspend fun put(key: String, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -510,15 +569,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBodyAndEncoding() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put(encoding = "encoding")
-                suspend fun put(key: String, value: S3Body)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put(encoding = "encoding")
+                        suspend fun put(key: String, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -527,15 +588,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBodyAndTypeAndEncoding() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put(type = "type", encoding = "encoding")
-                suspend fun put(key: String, value: S3Body)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put(type = "type", encoding = "encoding")
+                        suspend fun put(key: String, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -544,15 +607,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutKeyConcat() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put("{key1}-{key2}")
-                suspend fun put(key1: String, key2: Long, value: S3Body)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put("{key1}-{key2}")
+                        suspend fun put(key1: String, key2: Long, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -561,30 +626,34 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutKeyMissing() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put("{key1}-{key12345}")
-                suspend fun put(key1: String, value: S3Body)
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put("{key1}-{key12345}")
+                        suspend fun put(key1: String, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }
 
     @Test
     fun clientPutKeyConst() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put("const-key")
-                suspend fun put(value: S3Body)
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put("const-key")
+                        suspend fun put(value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -593,15 +662,17 @@ class S3KoraSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutKeyUnused() {
-        val result = this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put("const-key")
-                suspend fun put(key: String, value: S3Body)
-            }
-            """.trimIndent()
+        val result = compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put("const-key")
+                        suspend fun put(key: String, value: S3Body)
+                    }
+                    """.trimIndent()
+            )
         )
         assertThat(result.isFailed()).isTrue()
     }

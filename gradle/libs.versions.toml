@@ -2,8 +2,8 @@
 slf4j = "2.0.17"
 micrometer = "1.12.13"
 reactor = "3.6.12"
-kotlin_ = "1.9.10" # Visit https://kotlinlang.org/docs/releases.html#release-details to see versions compatability
-kotlin-coroutines = "1.7.3"
+kotlin_ = "2.1.21" # Visit https://kotlinlang.org/docs/releases.html#release-details to see versions compatability
+kotlin-coroutines = "1.10.2"
 jackson = "2.17.3"
 mockserver = "5.15.0"
 netty = "4.1.100.Final"
@@ -14,7 +14,7 @@ cassandra = "4.18.1"
 grpc-java = "1.65.1"
 grpc-kotlin = "1.4.1"
 kotlin-testing = "1.5.0"
-ksp = "1.9.10-1.0.13"
+ksp = "2.1.21-2.0.1"
 kotlinpoet = "1.18.1"
 swagger = "2.2.30"
 opentelemetry = "1.49.0"
@@ -22,6 +22,9 @@ undertow = "2.3.18.Final"
 undertow-jakarta = "6.2.12.Final"
 camunda7 = "7.21.0"
 zeebe = "8.6.13"
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin_" }
 
 ["libraries"]
 jsr305 = { module = "com.google.code.findbugs:jsr305", version = "3.0.2" }
@@ -130,6 +133,7 @@ mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version = "5.3.
 assertj = { module = "org.assertj:assertj-core", version = "3.25.3" }
 mockserver-netty = { module = "org.mock-server:mockserver-netty", version.ref = "mockserver" }
 mockserver-client = { module = "org.mock-server:mockserver-client-java", version.ref = "mockserver" }
+mockk = { module = "io.mockk:mockk", version = "1.14.2" }
 
 kafka-client = { module = "org.apache.kafka:kafka-clients", version.ref = "kafka" }
 
@@ -151,7 +155,6 @@ testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "tes
 
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "ksp" }
-kotlin-compile-testing = { module = "com.github.tschuchortdev:kotlin-compile-testing", version.ref = "kotlin-testing" }
 
 kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }

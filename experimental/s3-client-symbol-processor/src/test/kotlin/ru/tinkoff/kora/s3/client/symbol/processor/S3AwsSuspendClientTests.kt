@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 
 class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
+    val processors = listOf(S3ClientSymbolProcessorProvider())
 
     override fun commonImports(): String {
         return super.commonImports() + """
@@ -21,15 +22,17 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientGetAws() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Get
-                suspend fun get(key: String): GetObjectResponse
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Get
+                        suspend fun get(key: String): GetObjectResponse
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -38,16 +41,18 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListAws() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List
-                suspend fun list(): ListObjectsV2Response
-            }
-            
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List
+                        suspend fun list(): ListObjectsV2Response
+                    }
+                    
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -56,15 +61,17 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListAwsWithPrefix() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List
-                suspend fun list(prefix: String): ListObjectsV2Response
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List
+                        suspend fun list(prefix: String): ListObjectsV2Response
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -73,15 +80,17 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListAwsLimit() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List(limit = 100)
-                suspend fun list(prefix: String): ListObjectsV2Response
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List(limit = 100)
+                        suspend fun list(prefix: String): ListObjectsV2Response
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -90,15 +99,17 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientListKeyAndDelimiter() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.List(value = "some/path/to/{key1}/object", delimiter = "/")
-                suspend fun list(key1: String): ListObjectsV2Response
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.List(value = "some/path/to/{key1}/object", delimiter = "/")
+                        suspend fun list(key1: String): ListObjectsV2Response
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -107,16 +118,18 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientDeleteAws() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete
-                suspend fun delete(key: String): DeleteObjectResponse
-            }
-            
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete
+                        suspend fun delete(key: String): DeleteObjectResponse
+                    }
+                    
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -125,16 +138,18 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientDeletesAws() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Delete
-                suspend fun delete(key: List<String>): DeleteObjectsResponse
-            }
-            
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Delete
+                        suspend fun delete(key: List<String>): DeleteObjectsResponse
+                    }
+                    
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")
@@ -143,15 +158,17 @@ class S3AwsSuspendClientTests : AbstractSymbolProcessorTest() {
 
     @Test
     fun clientPutBody() {
-        this.compile0(
-            """
-            @S3.Client("my")
-            interface Client {
-                        
-                @S3.Put
-                suspend fun put(key: String, value: S3Body): PutObjectResponse
-            }
-            """.trimIndent()
+        compile0(
+            processors, *arrayOf<String>(
+                """
+                    @S3.Client("my")
+                    interface Client {
+                                
+                        @S3.Put
+                        suspend fun put(key: String, value: S3Body): PutObjectResponse
+                    }
+                    """.trimIndent()
+            )
         )
         compileResult.assertSuccess()
         val clazz = compileResult.loadClass("\$Client_Impl")

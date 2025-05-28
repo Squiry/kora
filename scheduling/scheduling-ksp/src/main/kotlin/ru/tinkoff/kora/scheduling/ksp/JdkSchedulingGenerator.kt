@@ -3,7 +3,6 @@ package ru.tinkoff.kora.scheduling.ksp
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
@@ -38,7 +37,7 @@ class JdkSchedulingGenerator(val environment: SymbolProcessorEnvironment) {
         val jobFunName = type.getOuterClassesAsPrefix() + type.simpleName.getShortName() + "_" + function.simpleName.getShortName() + "_Job";
         val initialDelay = trigger.annotation.findValue<Long>("initialDelay") ?: 0
         val period = trigger.annotation.findValue<Long>("period")
-        val unit = trigger.annotation.findValue<KSType>("unit")!!.toClassName()
+        val unit = trigger.annotation.findValue<KSClassDeclaration>("unit")!!.toClassName()
         val componentFunction = FunSpec.builder(jobFunName)
             .addParameter("telemetryFactory", schedulingTelemetryFactoryClassName)
             .addParameter("service", jdkSchedulingExecutor)
@@ -81,7 +80,7 @@ class JdkSchedulingGenerator(val environment: SymbolProcessorEnvironment) {
         val jobFunName = type.getOuterClassesAsPrefix() + type.simpleName.getShortName() + "_" + function.simpleName.getShortName() + "_Job";
         val initialDelay = trigger.annotation.findValue<Long>("initialDelay") ?: 0
         val delay = trigger.annotation.findValue<Long>("delay")
-        val unit = trigger.annotation.findValue<KSType>("unit")!!.toClassName()
+        val unit = trigger.annotation.findValue<KSClassDeclaration>("unit")!!.toClassName()
         val componentFunction = FunSpec.builder(jobFunName)
             .addParameter("telemetryFactory", schedulingTelemetryFactoryClassName)
             .addParameter("service", jdkSchedulingExecutor)
@@ -123,7 +122,7 @@ class JdkSchedulingGenerator(val environment: SymbolProcessorEnvironment) {
         val typeClassName = type.toClassName()
         val jobFunName = type.getOuterClassesAsPrefix() + type.simpleName.getShortName() + "_" + function.simpleName.getShortName() + "_Job";
         val delay = trigger.annotation.findValue<Long>("delay")
-        val unit = trigger.annotation.findValue<KSType>("unit")!!.toClassName()
+        val unit = trigger.annotation.findValue<KSClassDeclaration>("unit")!!.toClassName()
         val componentFunction = FunSpec.builder(jobFunName)
             .addParameter("telemetryFactory", schedulingTelemetryFactoryClassName)
             .addParameter("service", jdkSchedulingExecutor)

@@ -1,9 +1,15 @@
 package ru.tinkoff.kora.database.symbol.processor
 
 import org.intellij.lang.annotations.Language
+import ru.tinkoff.kora.database.symbol.processor.cassandra.CassandraEntitySymbolProcessorProvider
+import ru.tinkoff.kora.database.symbol.processor.cassandra.udt.CassandraUdtSymbolProcessorProvider
+import ru.tinkoff.kora.database.symbol.processor.jdbc.JdbcEntitySymbolProcessorProvider
+import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 
 abstract class AbstractRepositoryTest : AbstractSymbolProcessorTest() {
+    val processors =
+        listOf(RepositorySymbolProcessorProvider(), KoraAppProcessorProvider(), CassandraUdtSymbolProcessorProvider(), CassandraEntitySymbolProcessorProvider(), JdbcEntitySymbolProcessorProvider())
 
     override fun commonImports(): String {
         return super.commonImports() + """
@@ -14,7 +20,7 @@ abstract class AbstractRepositoryTest : AbstractSymbolProcessorTest() {
     }
 
     protected fun compile(connectionFactory: Any, arguments: List<*>, @Language("kotlin") vararg sources: String): TestObject {
-        val compileResult = compile0(*sources)
+        val compileResult = compile0(processors, *sources)
         if (compileResult.isFailed()) {
             throw compileResult.compilationException()
         }
@@ -34,7 +40,7 @@ abstract class AbstractRepositoryTest : AbstractSymbolProcessorTest() {
     }
 
     protected fun compileForArgs(arguments: Array<Any?>, @Language("kotlin") vararg sources: String): TestObject {
-        val compileResult = compile0(*sources)
+        val compileResult = compile0(processors, *sources)
         if (compileResult.isFailed()) {
             throw compileResult.compilationException()
         }

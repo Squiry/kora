@@ -9,7 +9,6 @@ import ru.tinkoff.kora.application.graph.RefreshableGraph
 import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.symbolProcess
 import ru.tinkoff.kora.resilient.symbol.processor.aop.testdata.AppWithConfig
-import java.util.function.Supplier
 import kotlin.reflect.KClass
 
 @KspExperimental
@@ -67,7 +66,7 @@ open class AppRunner : Assertions() {
     }
 
     private fun getClassLoader(classes: List<KClass<*>>): ClassLoader {
-        return symbolProcess(classes)
+        return symbolProcess(classes, KoraAppProcessorProvider(), AopSymbolProcessorProvider())
     }
 
     fun getGraphForClasses(targetClasses: List<KClass<*>>): InitializedGraph {
@@ -80,7 +79,7 @@ open class AppRunner : Assertions() {
             classes.add(app)
             val classLoader = getClassLoader(classes)
             val clazz = classLoader.loadClass(app.qualifiedName + "Graph")
-            val graphDraw = (clazz.constructors.first().newInstance() as Supplier<ApplicationGraphDraw>).get()
+            val graphDraw = (clazz.constructors.first().newInstance() as Function0<ApplicationGraphDraw>).invoke()
             val graph = graphDraw.init()
             InitializedGraph(graphDraw, graph)
         } catch (e: Exception) {

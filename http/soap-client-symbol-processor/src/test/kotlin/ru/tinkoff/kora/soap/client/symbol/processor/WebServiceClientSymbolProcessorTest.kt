@@ -1,5 +1,6 @@
 package ru.tinkoff.kora.soap.client.symbol.processor
 
+import com.google.devtools.ksp.impl.KotlinSymbolProcessing
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
@@ -7,15 +8,15 @@ import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import org.jetbrains.kotlin.config.Services
 import org.junit.jupiter.api.Test
 import ru.tinkoff.kora.annotation.processor.common.TestUtils
+import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest.Companion.classpath
+import ru.tinkoff.kora.ksp.common.KspCollectingLogger
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
-import java.util.stream.Collectors
 
 class WebServiceClientSymbolProcessorTest {
 
@@ -32,6 +33,8 @@ class WebServiceClientSymbolProcessorTest {
     private fun compileKotlin(targetDir: String) {
         val k2JvmArgs = K2JVMCompilerArguments()
         val kotlinOutPath = Path.of("build/in-test-generated-ksp/ksp/sources/kotlin").toAbsolutePath()
+        Files.walk(kotlinOutPath.resolveSibling("in-test-generated-kspOutputDir")).filter { it.toFile().isFile }.forEach { it.toFile().delete() }
+        val srcFiles = Files.walk(Path.of(targetDir)).use { it.filter { it.toFile().isFile }.map { it.toString() }.toList() }
         k2JvmArgs.noReflect = true
         k2JvmArgs.noStdlib = true
         k2JvmArgs.noJdk = false
@@ -45,27 +48,44 @@ class WebServiceClientSymbolProcessorTest {
         k2JvmArgs.jvmDefault = "all"
         k2JvmArgs.compileJava = true
         k2JvmArgs.verbose = true
-        k2JvmArgs.javaSourceRoots = arrayOf(Paths.get(targetDir).toAbsolutePath().toString())
+        k2JvmArgs.javaSourceRoots = srcFiles.toTypedArray()
         k2JvmArgs.freeArgs = listOf("build/tmp/empty.kt")
         k2JvmArgs.classpath = java.lang.String.join(File.pathSeparator, TestUtils.classpath)
-        val pluginClassPath: Array<String> = TestUtils.classpath.stream()
-            .filter { it.contains("symbol-processing") }
-            .toArray { Array(it) { "" } }
-        val processors: String = TestUtils.classpath.stream()
-            .filter { it.contains("symbol-processor") && (it.endsWith(".jar") || it.endsWith("main")) }
-            .collect(Collectors.joining(File.pathSeparator))
-        k2JvmArgs.pluginClasspaths = pluginClassPath
-        val ksp = "plugin:com.google.devtools.ksp.symbol-processing:"
-        k2JvmArgs.pluginOptions = arrayOf(
-            ksp + "kotlinOutputDir=" + kotlinOutPath,
-            ksp + "kspOutputDir=" + kotlinOutPath,
-            ksp + "classOutputDir=" + kotlinOutPath,
-            ksp + "javaOutputDir=" + kotlinOutPath,
-            ksp + "projectBaseDir=" + Path.of(".").toAbsolutePath(),
-            ksp + "resourceOutputDir=" + kotlinOutPath,
-            ksp + "cachesDir=" + kotlinOutPath,
-            ksp + "apclasspath=" + processors
-        )
+        k2JvmArgs.jdkHome = System.getProperty("java.home")
+
+
+        val kotlinOutputDir = kotlinOutPath.resolveSibling("in-test-generated-kspOutputDir")
+        val kspArgs = com.google.devtools.ksp.processing.KSPJvmConfig.Builder()
+        kspArgs.kotlinOutputDir = kotlinOutputDir.toFile()
+        kspArgs.classOutputDir = kotlinOutPath.resolveSibling("in-test-generated-classOutputDir").toFile()
+        kspArgs.outputBaseDir = kotlinOutPath.resolveSibling("in-test-generated-kspOutputDir").toFile()
+        kspArgs.incremental = false
+        kspArgs.javaOutputDir = kotlinOutPath.resolveSibling("in-test-generated-javaOutputDir").toFile()
+        kspArgs.projectBaseDir = Path.of(".").toAbsolutePath().toFile()
+        kspArgs.resourceOutputDir = kotlinOutPath.resolveSibling("in-test-generated-resourceOutputDir").toFile()
+        kspArgs.cachesDir = kotlinOutPath.resolveSibling("in-test-generated-cachesDir").toFile()
+        kspArgs.jvmTarget = "17"
+        kspArgs.moduleName = "test"
+        kspArgs.javaSourceRoots = srcFiles.map { File(it) }
+        kspArgs.languageVersion = "2.1.21"
+        kspArgs.apiVersion = "2.1.21"
+        kspArgs.libraries = classpath.map { File(it) }
+        kspArgs.jdkHome = File(System.getProperty("java.home"))
+        kspArgs.sourceRoots = listOf()
+
+
+        val kspLogger = KspCollectingLogger()
+        val start = System.currentTimeMillis()
+        val exitCode = KotlinSymbolProcessing(kspArgs.build(), listOf(WebServiceClientSymbolProcessorProvider()), kspLogger).execute()
+        val kspTook = System.currentTimeMillis() - start
+        println("KSP took $kspTook ms")
+        if (exitCode.code != 0) {
+            throw RuntimeException("KSP failed with code $exitCode")
+        }
+        k2JvmArgs.freeArgs = kotlinOutputDir.toFile().walkTopDown().filter { it.isFile }.map { it.toString() }.toList()
+
+
+
         Files.writeString(
             Path.of("build/tmp/empty.kt"),
             "fun test() { }",

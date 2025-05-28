@@ -5,13 +5,10 @@ import org.mockito.Mockito
 import org.mockito.kotlin.any
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
-import ru.tinkoff.kora.config.common.extractor.BooleanConfigValueExtractor
-import ru.tinkoff.kora.config.common.extractor.ConfigValueExtractor
-import ru.tinkoff.kora.config.common.extractor.DoubleArrayConfigValueExtractor
-import ru.tinkoff.kora.config.common.extractor.DurationConfigValueExtractor
-import ru.tinkoff.kora.config.common.extractor.SetConfigValueExtractor
-import ru.tinkoff.kora.config.common.extractor.StringConfigValueExtractor
+import ru.tinkoff.kora.config.common.extractor.*
 import ru.tinkoff.kora.config.common.factory.MapConfigFactory
+import ru.tinkoff.kora.config.ksp.processor.ConfigParserSymbolProcessorProvider
+import ru.tinkoff.kora.config.ksp.processor.ConfigSourceSymbolProcessorProvider
 import ru.tinkoff.kora.http.client.common.HttpClient
 import ru.tinkoff.kora.http.client.common.declarative.`$HttpClientOperationConfig_ConfigValueExtractor`
 import ru.tinkoff.kora.http.client.common.request.HttpClientRequest
@@ -20,6 +17,7 @@ import ru.tinkoff.kora.http.client.common.telemetry.`$HttpClientLoggerConfig_Con
 import ru.tinkoff.kora.http.client.common.telemetry.`$HttpClientTelemetryConfig_ConfigValueExtractor`
 import ru.tinkoff.kora.http.client.common.telemetry.HttpClientTelemetryFactory
 import ru.tinkoff.kora.http.common.body.HttpBody
+import ru.tinkoff.kora.kora.app.ksp.KoraAppProcessorProvider
 import ru.tinkoff.kora.ksp.common.AbstractSymbolProcessorTest
 import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_MetricsConfig_ConfigValueExtractor`
 import ru.tinkoff.kora.telemetry.common.`$TelemetryConfig_TracingConfig_ConfigValueExtractor`
@@ -79,7 +77,7 @@ abstract class AbstractHttpClientTest : AbstractSymbolProcessorTest() {
     }
 
     protected fun compile(arguments: List<Any?>, @Language("kotlin") vararg sources: String): TestObject {
-        val compileResult = compile0(*sources)
+        val compileResult = compile0(listOf(HttpClientSymbolProcessorProvider(), KoraAppProcessorProvider(), ConfigSourceSymbolProcessorProvider(), ConfigParserSymbolProcessorProvider()), *sources)
         if (compileResult.isFailed()) {
             throw compileResult.compilationException()
         }

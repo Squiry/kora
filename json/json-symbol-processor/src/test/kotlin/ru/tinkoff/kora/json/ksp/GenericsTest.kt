@@ -6,47 +6,6 @@ import ru.tinkoff.kora.json.common.JsonWriter
 import ru.tinkoff.kora.ksp.common.GraphUtil.toGraph
 
 class GenericsTest : AbstractJsonSymbolProcessorTest() {
-    @Test
-    fun testGenericJsonReaderExtension() {
-        compile(
-            """
-            data class TestClass <T> (val value:T)             
-            """.trimIndent(),
-            """
-                @KoraApp
-                interface TestApp : ru.tinkoff.kora.json.common.JsonCommonModule {
-                  @Root
-                  fun root(w1: ru.tinkoff.kora.json.common.JsonReader<TestClass<String>>, w2: ru.tinkoff.kora.json.common.JsonReader<TestClass<Int>>, w3: ru.tinkoff.kora.json.common.JsonReader<TestClass<Int?>>) = ""
-                }
-            """.trimIndent()
-        )
-        val graph = loadClass("TestAppGraph").toGraph()
-        val reader = graph.findAllByType(readerClass("TestClass")) as List<JsonReader<Any?>>
-
-        reader[0].assertRead("{\"value\":\"test\"}", new("TestClass", "test"))
-        reader[1].assertRead("{\"value\":42}", new("TestClass", 42))
-    }
-
-    @Test
-    fun testGenericJsonWriterExtension() {
-        compile(
-            """
-            data class TestClass <T> (val value:T)             
-            """.trimIndent(),
-            """
-                @KoraApp
-                interface TestApp : ru.tinkoff.kora.json.common.JsonCommonModule {
-                  @Root
-                  fun root(w1: ru.tinkoff.kora.json.common.JsonWriter<TestClass<String>>, w2: ru.tinkoff.kora.json.common.JsonWriter<TestClass<Int>>, w3: ru.tinkoff.kora.json.common.JsonWriter<TestClass<Int?>>) = ""
-                }
-            """.trimIndent()
-        )
-        val graph = loadClass("TestAppGraph").toGraph()
-        val writer = graph.findAllByType(writerClass("TestClass")) as List<JsonWriter<Any?>>
-
-        writer[0].assertWrite(new("TestClass", "test"), "{\"value\":\"test\"}")
-        writer[1].assertWrite(new("TestClass", 42), "{\"value\":42}")
-    }
 
     @Test
     fun testGenericJsonWriterExtensionWithIncludeClassAlways() {
@@ -55,6 +14,7 @@ class GenericsTest : AbstractJsonSymbolProcessorTest() {
             import ru.tinkoff.kora.json.common.annotation.JsonInclude
             
             @JsonInclude(JsonInclude.IncludeType.ALWAYS)
+            @Json
             data class TestClass <T> (val value: T?, val values: List<T>?)             
             """.trimIndent(),
             """

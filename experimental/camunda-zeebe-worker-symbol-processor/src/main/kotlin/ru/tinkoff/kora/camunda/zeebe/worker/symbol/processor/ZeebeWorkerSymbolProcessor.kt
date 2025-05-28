@@ -22,7 +22,7 @@ import ru.tinkoff.kora.ksp.common.FunctionUtils.isVoid
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.toTypeName
 import ru.tinkoff.kora.ksp.common.exception.ProcessingErrorException
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 import java.io.IOException
 import java.io.UncheckedIOException
 import java.util.concurrent.CompletableFuture
@@ -67,7 +67,7 @@ class ZeebeWorkerSymbolProcessor(
             val ownerType = getOwner(method)
             val variables = getVariables(method)
 
-            val implSpecBuilder = TypeSpec.classBuilder(ownerType.generatedClassName("${method.simpleName.asString()}_KoraJobWorker"))
+            val implSpecBuilder = TypeSpec.classBuilder(ownerType.generatedClass("${method.simpleName.asString()}_KoraJobWorker"))
                 .generated(ZeebeWorkerSymbolProcessor::class)
                 .addAnnotation(CommonClassNames.component)
                 .addSuperinterface(CLASS_KORA_WORKER)

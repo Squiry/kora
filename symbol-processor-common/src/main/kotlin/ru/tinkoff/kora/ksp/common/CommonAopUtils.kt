@@ -25,13 +25,13 @@ object CommonAopUtils {
             b.superclass(type.toClassName())
         }
 
-        var hasAop = hasAopAnnotation(type)
+        var hasAop = type.hasAopAnnotation()
         val methods = findMethods(type) { f -> f.isPublic() || f.isProtected() }
         for (method in methods) {
-            var isMethodAop = hasAopAnnotation(method)
+            var isMethodAop = method.hasAopAnnotation()
 
             for (parameter in method.parameters) {
-                if (hasAopAnnotation(parameter)) {
+                if (parameter.hasAopAnnotation()) {
                     isMethodAop = true
                 }
             }
@@ -57,7 +57,7 @@ object CommonAopUtils {
         }
 
         for (annotationMirror in type.annotations) {
-            if (isAopAnnotation(annotationMirror)) {
+            if (annotationMirror.isAopAnnotation()) {
                 b.addAnnotation(annotationMirror.toAnnotationSpec())
             }
         }
@@ -82,7 +82,7 @@ object CommonAopUtils {
         }
         funBuilder.addModifiers(KModifier.OVERRIDE)
         for (annotation in funDeclaration.annotations) {
-            if (isAopAnnotation(annotation)) {
+            if (annotation.isAopAnnotation()) {
                 funBuilder.addAnnotation(annotation.toAnnotationSpec())
             }
         }
@@ -98,7 +98,7 @@ object CommonAopUtils {
                 pb.addModifiers(KModifier.VARARG)
             }
             for (annotation in parameter.annotations) {
-                if (isAopAnnotation(annotation)) {
+                if (annotation.isAopAnnotation()) {
                     pb.addAnnotation(annotation.toAnnotationSpec())
                 }
             }
@@ -108,19 +108,19 @@ object CommonAopUtils {
         return funBuilder
     }
 
-    fun hasAopAnnotations(ksAnnotated: KSAnnotated): Boolean {
-        if (hasAopAnnotation(ksAnnotated)) {
+    fun KSAnnotated.hasAopAnnotations(): Boolean {
+        if (this.hasAopAnnotation()) {
             return true
         }
-        val methods = findMethods(ksAnnotated) { f ->
+        val methods = findMethods(this) { f ->
             f.isPublic() || f.isProtected()
         }
         for (method in methods) {
-            if (hasAopAnnotation(method)) {
+            if (method.hasAopAnnotation()) {
                 return true
             }
             for (parameter in method.parameters) {
-                if (hasAopAnnotation(parameter)) {
+                if (parameter.hasAopAnnotation()) {
                     return true
                 }
             }
@@ -128,12 +128,12 @@ object CommonAopUtils {
         return false
     }
 
-    fun hasAopAnnotation(e: KSAnnotated): Boolean {
-        return e.annotations.any { isAopAnnotation(it) }
+    fun KSAnnotated.hasAopAnnotation(): Boolean {
+        return annotations.any { it.isAopAnnotation() }
     }
 
-    fun isAopAnnotation(annotation: KSAnnotation): Boolean {
-        return annotation.annotationType.resolveToUnderlying().declaration.isAnnotationPresent(aopAnnotation)
+    fun KSAnnotation.isAopAnnotation(): Boolean {
+        return annotationType.resolveToUnderlying().declaration.isAnnotationPresent(aopAnnotation)
     }
 
 }

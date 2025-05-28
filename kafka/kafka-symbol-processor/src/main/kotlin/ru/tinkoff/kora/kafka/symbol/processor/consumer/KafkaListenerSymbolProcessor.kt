@@ -23,7 +23,9 @@ class KafkaListenerSymbolProcessor(private val environment: SymbolProcessorEnvir
         }
         for (ksClassDeclaration in controllers) {
             try {
-                processController(ksClassDeclaration)
+                context(resolver) {
+                    processController(ksClassDeclaration)
+                }
             } catch (e: ProcessingErrorException) {
                 e.printError(kspLogger)
             }
@@ -31,6 +33,7 @@ class KafkaListenerSymbolProcessor(private val environment: SymbolProcessorEnvir
         return emptyList()
     }
 
+    context(r: Resolver)
     private fun processController(controller: KSClassDeclaration) {
         val methodGenerator = KafkaHandlerGenerator(environment.logger)
         val kafkaConfigGenerator = KafkaConsumerConfigGenerator()

@@ -8,7 +8,7 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.ksp.toTypeVariableName
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findAnnotation
 import ru.tinkoff.kora.ksp.common.AnnotationUtils.findValue
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 import ru.tinkoff.kora.ksp.common.isJavaRecord
 import java.util.*
 
@@ -20,8 +20,8 @@ fun jsonClassPackage(classDeclaration: KSClassDeclaration): String {
     return classDeclaration.packageName.asString()
 }
 
-fun KSClassDeclaration.jsonReaderName() = this.generatedClassName("JsonReader")
-fun KSClassDeclaration.jsonWriterName() = this.generatedClassName("JsonWriter")
+fun KSClassDeclaration.jsonReaderName() = this.generatedClass(JsonTypes.jsonReader)
+fun KSClassDeclaration.jsonWriterName() = this.generatedClass(JsonTypes.jsonWriter)
 
 private val RESTRICTED_PACKAGES = listOf("java.", "javax.", "sun.", "com.sun.", "jdk.", "kotlin.")
 

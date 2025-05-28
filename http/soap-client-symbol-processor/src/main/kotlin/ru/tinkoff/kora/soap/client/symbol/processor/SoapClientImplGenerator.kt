@@ -19,7 +19,7 @@ import ru.tinkoff.kora.ksp.common.KotlinPoetUtils.controlFlow
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
 import ru.tinkoff.kora.ksp.common.TagUtils.toTagAnnotation
 import ru.tinkoff.kora.ksp.common.doesImplement
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 import ru.tinkoff.kora.ksp.common.getOuterClassesAsPrefix
 import ru.tinkoff.kora.soap.client.common.*
 import ru.tinkoff.kora.soap.client.common.envelope.SoapEnvelope
@@ -48,7 +48,7 @@ class SoapClientImplGenerator(private val resolver: Resolver) {
         }
 
         val configPath = "soapClient.$serviceName"
-        val moduleName = declaration.generatedClassName("SoapClientModule")
+        val moduleName = declaration.generatedClass("SoapClientModule")
         val extractorClass = CommonClassNames.configValueExtractor.parameterizedBy(soapConfig)
         val elementType = declaration.toClassName()
 
@@ -113,7 +113,7 @@ class SoapClientImplGenerator(private val resolver: Resolver) {
         }
 
         fun findWrapperMethod(func: KSFunctionDeclaration, parameter: KSValueParameter): KSFunctionDeclaration? {
-            val paramFactoryName = "create" + func.simpleName.asString().replaceFirstChar { it.uppercase() } + parameter.name.toString().replaceFirstChar { it.uppercase() }
+            val paramFactoryName = "create" + func.simpleName.asString().replaceFirstChar { it.uppercase() } + parameter.name?.asString()?.replaceFirstChar { it.uppercase() }
             for (f in decl.getAllFunctions()) {
                 if (f.parameters.size == 1 && f.simpleName.asString() == paramFactoryName) {
                     return f
@@ -386,11 +386,15 @@ class SoapClientImplGenerator(private val resolver: Resolver) {
             m.addCode("val __responseBodyWrapper =  __success.body() as (%L)\n", wrapperClass)
             if (webResult != null) {
                 val webResultName = webResult.findValue<String>("name")!!
-                m.addCode("return __responseBodyWrapper.get%L", webResultName.replaceFirstChar { it.uppercaseChar() })
+                m.addCode("return __responseBodyWrapper.get%L()", webResultName.replaceFirstChar { it.uppercaseChar() })
                 val objectFactory = objectFactories.findObjectFactoryByWrapper(wrapperClass)
                 val wrapperFieldType = objectFactory.findWrapperResponseType(wrapperClass)
-                if (wrapperFieldType.toString() == method.returnType.toString()) {
-                    m.addCode(".value")
+                val wrapperTypeName = wrapperFieldType.toTypeName()
+                val methodReturnTypeName = method.returnType!!.toTypeName()
+                if (wrapperTypeName is ParameterizedTypeName && wrapperTypeName.rawType == soapClasses.jaxbElementTypeName()) {
+                    if (methodReturnTypeName !is ParameterizedTypeName) {
+                        m.addCode(".value")
+                    }
                 }
                 m.addCode("\n")
             } else {

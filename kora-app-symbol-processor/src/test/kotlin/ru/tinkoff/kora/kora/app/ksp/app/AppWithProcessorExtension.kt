@@ -1,7 +1,6 @@
 package ru.tinkoff.kora.kora.app.ksp.app
 
 import com.google.devtools.ksp.getClassDeclarationByName
-import com.google.devtools.ksp.getConstructors
 import com.google.devtools.ksp.processing.*
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -16,6 +15,7 @@ import ru.tinkoff.kora.kora.app.ksp.extension.ExtensionFactory
 import ru.tinkoff.kora.kora.app.ksp.extension.ExtensionResult
 import ru.tinkoff.kora.kora.app.ksp.extension.KoraExtension
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.generated
+import ru.tinkoff.kora.ksp.common.generatedClass
 import ru.tinkoff.kora.ksp.common.visitClass
 
 @KoraApp
@@ -31,8 +31,8 @@ interface AppWithProcessorExtension {
     interface Interface1
     class TestExtensionExtensionFactory : ExtensionFactory {
 
-        override fun create(resolver: Resolver, kspLogger: KSPLogger, codeGenerator: CodeGenerator): KoraExtension {
-            return TestExtension(resolver, codeGenerator)
+        override fun create(resolver: Resolver, kspLogger: KSPLogger): KoraExtension {
+            return TestExtension(resolver)
         }
     }
 
@@ -52,7 +52,7 @@ interface AppWithProcessorExtension {
             symbols.forEach {
                 it.visitClass { declaration ->
                     val packageName = interfaceDeclaration.packageName.asString()
-                    val typeName = "AppWithExtensionInterface1Impl"
+                    val typeName = declaration.generatedClass("Impl")
                     val type = TypeSpec.classBuilder(typeName)
                         .generated(TestProcessor::class)
                         .addModifiers(KModifier.PUBLIC)
@@ -66,23 +66,14 @@ interface AppWithProcessorExtension {
         }
     }
 
-    class TestExtension(val resolver: Resolver, val codeGenerator: CodeGenerator) : KoraExtension {
+    class TestExtension(val resolver: Resolver) : KoraExtension {
         private val interfaceDeclaration = resolver.getClassDeclarationByName(Interface1::class.qualifiedName!!)!!
         private val interfaceType = interfaceDeclaration.asStarProjectedType()
         override fun getDependencyGenerator(resolver: Resolver, type: KSType, tags: Set<String>): (() -> ExtensionResult)? {
             if (type != interfaceType) {
                 return null
             }
-            val packageName = interfaceDeclaration.packageName.asString()
-            val typeName = "AppWithExtensionInterface1Impl"
-            return lambda@{
-                val maybeGenerated = resolver.getClassDeclarationByName("$packageName.$typeName")
-                if (maybeGenerated != null) {
-                    val constructor = maybeGenerated.getConstructors().first()
-                    return@lambda ExtensionResult.fromConstructor(constructor, maybeGenerated)
-                }
-                return@lambda ExtensionResult.RequiresCompilingResult
-            }
+            return generatedByProcessor(resolver, type, type.declaration as KSClassDeclaration, "Impl")
         }
     }
 }

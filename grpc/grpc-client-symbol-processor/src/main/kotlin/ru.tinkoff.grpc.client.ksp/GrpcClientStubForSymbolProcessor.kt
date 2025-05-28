@@ -17,7 +17,7 @@ import ru.tinkoff.kora.ksp.common.BaseSymbolProcessor
 import ru.tinkoff.kora.ksp.common.CommonClassNames
 import ru.tinkoff.kora.ksp.common.KspCommonUtils.addOriginatingKSFile
 import ru.tinkoff.kora.ksp.common.TagUtils.addTag
-import ru.tinkoff.kora.ksp.common.generatedClassName
+import ru.tinkoff.kora.ksp.common.generatedClass
 
 class GrpcClientStubForSymbolProcessor(val env: SymbolProcessorEnvironment) : BaseSymbolProcessor(env) {
     override fun processRound(resolver: Resolver): List<KSAnnotated> {
@@ -44,7 +44,7 @@ class GrpcClientStubForSymbolProcessor(val env: SymbolProcessorEnvironment) : Ba
 
         val type = symbol.toClassName()
 
-        val module = TypeSpec.interfaceBuilder(parent.generatedClassName("_GrpcModule"))
+        val module = TypeSpec.interfaceBuilder(parent.generatedClass("_GrpcModule"))
             .addOriginatingKSFile(parent)
             .addAnnotation(CommonClassNames.module)
             .addFunction(FunSpec.builder(parent.simpleName.asString() + "_client")
