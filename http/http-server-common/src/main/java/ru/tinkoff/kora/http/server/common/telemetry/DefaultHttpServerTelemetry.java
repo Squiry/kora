@@ -18,22 +18,21 @@ public final class DefaultHttpServerTelemetry implements HttpServerTelemetry {
     private final DefaultHttpServerMetrics metrics;
     private final DefaultHttpServerLogger logger;
 
+    public DefaultHttpServerTelemetry(Tracer tracer, DefaultHttpServerMetrics metrics, DefaultHttpServerLogger logger) {
+        this.tracer = tracer;
+        this.metrics = metrics;
+        this.logger = logger;
+    }
+
     public DefaultHttpServerTelemetry(HttpServerTelemetryConfig config, MeterRegistry meterRegistry, Tracer tracer) {
-        if (config.metrics().enabled() == Boolean.TRUE) {
-            this.metrics = new DefaultHttpServerMetrics(meterRegistry, null, config.metrics());
-        } else {
-            this.metrics = null;
-        }
-        if (config.logging().enabled() == Boolean.TRUE) {
-            this.logger = new DefaultHttpServerLogger(config.logging());
-        } else {
-            this.logger = null;
-        }
-        if (config.tracing().enabled() == Boolean.TRUE) {
-            this.tracer = tracer;
-        } else {
-            this.tracer = null;
-        }
+        var metrics = (config.metrics().enabled() == Boolean.TRUE)
+            ? new DefaultHttpServerMetrics(meterRegistry, null, config.metrics())
+            : null;
+        var logger = config.logging().enabled() == Boolean.TRUE
+            ? new DefaultHttpServerLogger(config.logging())
+            : null;
+        tracer = config.tracing().enabled() == Boolean.TRUE ? tracer : null;
+        this(tracer, metrics, logger);
     }
 
     @Override
