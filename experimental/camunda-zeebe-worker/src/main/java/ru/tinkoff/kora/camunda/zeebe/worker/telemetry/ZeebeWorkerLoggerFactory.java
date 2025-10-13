@@ -6,5 +6,5 @@ import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 public interface ZeebeWorkerLoggerFactory {
 
     @Nullable
-    ZeebeWorkerLogger get(TelemetryConfig.LogConfig config);
+    ZeebeWorkerLogger get(TelemetryConfig.LoggingConfig config);
 }

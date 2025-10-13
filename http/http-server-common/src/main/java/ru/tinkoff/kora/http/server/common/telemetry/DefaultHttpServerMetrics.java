@@ -1,11 +1,11 @@
-package ru.tinkoff.kora.micrometer.module.http.server;
+package ru.tinkoff.kora.http.server.common.telemetry;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.Nullable;
-import ru.tinkoff.kora.http.common.HttpResultCode;
-import ru.tinkoff.kora.http.common.header.HttpHeaders;
+import ru.tinkoff.kora.http.server.common.HttpServerRequest;
+import ru.tinkoff.kora.http.server.common.router.PublicApiRequest;
 import ru.tinkoff.kora.micrometer.module.http.server.tag.ActiveRequestsKey;
 import ru.tinkoff.kora.micrometer.module.http.server.tag.DurationKey;
 import ru.tinkoff.kora.micrometer.module.http.server.tag.MicrometerHttpServerTagsProvider;
@@ -15,21 +15,26 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public final class OpentelemetryHttpServerMetrics implements HttpServerMetrics {
+public final class DefaultHttpServerMetrics {
+    static final String UNMATCHED_ROUTE_TEMPLATE = "UNKNOWN_ROUTE";
     private final MeterRegistry meterRegistry;
     private final MicrometerHttpServerTagsProvider httpServerTagsProvider;
     private final ConcurrentHashMap<ActiveRequestsKey, AtomicInteger> requestCounters = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<DurationKey, Timer> duration = new ConcurrentHashMap<>();
     private final TelemetryConfig.MetricsConfig config;
 
-    public OpentelemetryHttpServerMetrics(MeterRegistry meterRegistry, MicrometerHttpServerTagsProvider httpServerTagsProvider, @Nullable TelemetryConfig.MetricsConfig config) {
+    public DefaultHttpServerMetrics(MeterRegistry meterRegistry, MicrometerHttpServerTagsProvider httpServerTagsProvider, @Nullable TelemetryConfig.MetricsConfig config) {
         this.meterRegistry = meterRegistry;
         this.httpServerTagsProvider = httpServerTagsProvider;
         this.config = config;
     }
 
-    @Override
-    public void requestStarted(String method, String pathTemplate, String host, String scheme) {
+    public void requestStarted(PublicApiRequest publicApiRequest, HttpServerRequest request) {
+        var method = request.method();
+        var scheme = publicApiRequest.scheme();
+        var host = publicApiRequest.hostName();
+        var pathTemplate = request.route() != null ? request.route() : UNMATCHED_ROUTE_TEMPLATE;
+
         var counter = requestCounters.computeIfAbsent(new ActiveRequestsKey(method, pathTemplate, host, scheme), activeRequestsKey -> {
             var c = new AtomicInteger(0);
             this.registerActiveRequestsGauge(activeRequestsKey, c);
@@ -38,8 +43,10 @@ public final class OpentelemetryHttpServerMetrics implements HttpServerMetrics {
         counter.incrementAndGet();
     }
 
-    @Override
-    public void requestFinished(int statusCode, HttpResultCode resultCode, String scheme, String host, String method, String pathTemplate, HttpHeaders headers, long processingTimeNanos, Throwable exception) {
+    public void requestFinished(int statusCode, PublicApiRequest rq, String pathTemplate, long processingTimeNanos, Throwable exception) {
+        var method = rq.method();
+        var scheme = rq.scheme();
+        var host = rq.hostName();
         var counter = requestCounters.computeIfAbsent(new ActiveRequestsKey(method, pathTemplate, host, scheme), activeRequestsKey -> {
             var c = new AtomicInteger(0);
             this.registerActiveRequestsGauge(activeRequestsKey, c);

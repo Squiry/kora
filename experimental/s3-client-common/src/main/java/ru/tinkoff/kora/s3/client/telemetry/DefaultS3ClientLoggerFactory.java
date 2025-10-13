@@ -7,7 +7,7 @@ import java.util.Objects;
 public class DefaultS3ClientLoggerFactory implements S3ClientLoggerFactory {
 
     @Override
-    public S3ClientLogger get(TelemetryConfig.LogConfig logging, Class<?> client) {
+    public S3ClientLogger get(TelemetryConfig.LoggingConfig logging, Class<?> client) {
         if (Objects.requireNonNullElse(logging.enabled(), false)) {
             return new DefaultS3ClientLogger(client);
         } else {

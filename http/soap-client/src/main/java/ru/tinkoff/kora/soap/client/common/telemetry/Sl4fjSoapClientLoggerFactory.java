@@ -16,7 +16,7 @@ public class Sl4fjSoapClientLoggerFactory implements SoapClientLoggerFactory {
 
     @Nullable
     @Override
-    public SoapClientLogger get(TelemetryConfig.LogConfig logging, String serviceClass, String serviceName, String soapMethod, String url) {
+    public SoapClientLogger get(TelemetryConfig.LoggingConfig logging, String serviceClass, String serviceName, String soapMethod, String url) {
         if (Objects.requireNonNullElse(logging.enabled(), false)) {
             var requestLog = LoggerFactory.getLogger(serviceClass + ".request");
             var responseLog = LoggerFactory.getLogger(serviceClass + ".response");

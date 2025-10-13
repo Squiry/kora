@@ -29,7 +29,7 @@ class PublicApiHandlerTest {
             handler("GET", "/foo/bar/{otherVariable}/baz")
         );
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, List.of(), telemetryFactory, config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
     }
 
     @Test
@@ -39,7 +39,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/{otherVariable}/baz")
         );
         var config = config(false);
-        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), telemetryFactory, config));
+        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), config));
     }
 
 
@@ -50,7 +50,7 @@ class PublicApiHandlerTest {
             handler("GET", "/foo/bar/{otherVariable}")
         );
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, List.of(), telemetryFactory, config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
     }
 
     @Test
@@ -60,7 +60,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/{otherVariable}")
         );
         var config = config(false);
-        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), telemetryFactory, config));
+        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), config));
     }
 
     @Test
@@ -70,7 +70,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/{otherVariable}/")
         );
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, List.of(), telemetryFactory, config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
     }
 
     @Test
@@ -80,7 +80,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/{otherVariable}/")
         );
         var config = config(true);
-        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), telemetryFactory, config));
+        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), config));
     }
 
     @Test
@@ -90,7 +90,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/{otherVariable}/baz")
         );
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, List.of(), telemetryFactory, config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
     }
 
     @Test
@@ -100,7 +100,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/{otherVariable}/baz")
         );
         var config = config(true);
-        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), telemetryFactory, config));
+        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), config));
     }
 
     @Test
@@ -110,7 +110,7 @@ class PublicApiHandlerTest {
             handler("GET", "/foo/bar")
         );
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, List.of(), telemetryFactory, config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
     }
 
     @Test
@@ -120,7 +120,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar")
         );
         var config = config(false);
-        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), telemetryFactory, config));
+        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), config));
     }
 
     @Test
@@ -131,7 +131,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/")
         );
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, List.of(), telemetryFactory, config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
     }
 
     @Test
@@ -142,7 +142,7 @@ class PublicApiHandlerTest {
             handler("POST", "/foo/bar/")
         );
         var config = config(true);
-        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), telemetryFactory, config));
+        Assertions.assertThatThrownBy(() -> new PublicApiHandler(handlers, List.of(), config));
     }
 
     private HttpServerConfig config(boolean ignoreTrailingSlash) {

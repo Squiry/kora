@@ -8,7 +8,7 @@ import java.util.Collections;
 import java.util.Set;
 
 @ConfigValueExtractor
-public interface HttpClientLoggerConfig extends TelemetryConfig.LogConfig {
+public interface HttpClientLoggerConfig extends TelemetryConfig.LoggingConfig {
 
     default Set<String> maskQueries() {
         return Collections.emptySet();

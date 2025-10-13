@@ -112,7 +112,7 @@ public interface CamundaEngineBpmnConfig {
     }
 
     @ConfigValueExtractor
-    interface CamundaEngineLogConfig extends TelemetryConfig.LogConfig {
+    interface CamundaEngineLogConfig extends TelemetryConfig.LoggingConfig {
 
         default boolean stacktrace() {
             return true;
@@ -120,7 +120,7 @@ public interface CamundaEngineBpmnConfig {
     }
 
     @ConfigValueExtractor
-    interface CamundaEngineTelemetryConfig extends TelemetryConfig.LogConfig {
+    interface CamundaEngineTelemetryConfig extends TelemetryConfig.LoggingConfig {
 
         default boolean stacktrace() {
             return true;

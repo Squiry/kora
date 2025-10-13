@@ -5,7 +5,7 @@ import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 public class DefaultZeebeWorkerLoggerFactory implements ZeebeWorkerLoggerFactory {
 
     @Override
-    public ZeebeWorkerLogger get(TelemetryConfig.LogConfig config) {
+    public ZeebeWorkerLogger get(TelemetryConfig.LoggingConfig config) {
         if (Boolean.TRUE.equals(config.enabled())) {
             return new DefaultZeebeWorkerLogger();
         }

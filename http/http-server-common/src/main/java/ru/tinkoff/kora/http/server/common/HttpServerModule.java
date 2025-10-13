@@ -12,7 +12,8 @@ import ru.tinkoff.kora.config.common.Config;
 import ru.tinkoff.kora.config.common.extractor.ConfigValueExtractor;
 import ru.tinkoff.kora.http.server.common.handler.HttpServerRequestHandler;
 import ru.tinkoff.kora.http.server.common.router.PublicApiHandler;
-import ru.tinkoff.kora.http.server.common.telemetry.*;
+import ru.tinkoff.kora.http.server.common.telemetry.DefaultHttpServerTelemetryFactory;
+import ru.tinkoff.kora.http.server.common.telemetry.PrivateApiMetrics;
 
 import java.util.Optional;
 
@@ -31,9 +32,8 @@ public interface HttpServerModule extends StringParameterReadersModule, HttpServ
 
     default PublicApiHandler publicApiHandler(All<HttpServerRequestHandler> handlers,
                                               @Tag(HttpServerModule.class) All<HttpServerInterceptor> interceptors,
-                                              HttpServerTelemetryFactory telemetry,
                                               HttpServerConfig config) {
-        return new PublicApiHandler(handlers, interceptors, telemetry, config);
+        return new PublicApiHandler(handlers, interceptors, config);
     }
 
     @DefaultComponent

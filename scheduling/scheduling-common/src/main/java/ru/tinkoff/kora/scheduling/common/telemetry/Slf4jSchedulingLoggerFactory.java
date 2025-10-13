@@ -9,7 +9,7 @@ import java.util.Objects;
 public final class Slf4jSchedulingLoggerFactory implements SchedulingLoggerFactory {
     @Override
     @Nullable
-    public SchedulingLogger get(TelemetryConfig.LogConfig logging, Class<?> jobClass, String jobMethod) {
+    public SchedulingLogger get(TelemetryConfig.LoggingConfig logging, Class<?> jobClass, String jobMethod) {
         if (Objects.requireNonNullElse(logging.enabled(), false)) {
             var log = LoggerFactory.getLogger(jobClass.getCanonicalName() + "." + jobMethod);
             return new Slf4jSchedulingLogger(log, jobClass.getCanonicalName(), jobMethod);

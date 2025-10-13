@@ -40,7 +40,7 @@ public interface CamundaRestConfig {
     }
 
     @ConfigValueExtractor
-    interface CamundaRestLoggerConfig extends TelemetryConfig.LogConfig {
+    interface CamundaRestLoggerConfig extends TelemetryConfig.LoggingConfig {
 
         default boolean stacktrace() {
             return true;

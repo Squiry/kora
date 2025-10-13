@@ -5,5 +5,5 @@ import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 
 public interface HttpClientLoggerFactory {
     @Nullable
-    HttpClientLogger get(TelemetryConfig.LogConfig logging, String clientName);
+    HttpClientLogger get(TelemetryConfig.LoggingConfig logging, String clientName);
 }

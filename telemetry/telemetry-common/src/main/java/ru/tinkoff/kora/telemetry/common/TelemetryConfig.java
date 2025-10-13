@@ -7,14 +7,14 @@ import java.time.Duration;
 
 @ConfigValueExtractor
 public interface TelemetryConfig {
-    LogConfig logging();
+    LoggingConfig logging();
 
     TracingConfig tracing();
 
     MetricsConfig metrics();
 
     @ConfigValueExtractor
-    interface LogConfig {
+    interface LoggingConfig {
         @Nullable
         Boolean enabled();
     }

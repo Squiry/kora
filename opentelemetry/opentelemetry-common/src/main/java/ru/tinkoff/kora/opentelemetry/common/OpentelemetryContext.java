@@ -7,6 +7,8 @@ import ru.tinkoff.kora.common.Context;
 import ru.tinkoff.kora.logging.common.MDC;
 
 public class OpentelemetryContext {
+    public static final ScopedValue<io.opentelemetry.context.Context> VALUE = ScopedValue.newInstance();
+
     private static final Context.Key<OpentelemetryContext> KEY = new Context.Key<>() {
         @Override
         protected OpentelemetryContext copy(OpentelemetryContext object) {

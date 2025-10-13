@@ -10,7 +10,7 @@ import java.util.Properties;
 public class DefaultKafkaProducerLoggerFactory implements KafkaProducerLoggerFactory {
     @Override
     @Nullable
-    public KafkaProducerLogger get(TelemetryConfig.LogConfig logging, Producer<?, ?> producer, Properties properties) {
+    public KafkaProducerLogger get(TelemetryConfig.LoggingConfig logging, Producer<?, ?> producer, Properties properties) {
         if (Objects.requireNonNullElse(logging.enabled(), false)) {
             return new DefaultKafkaProducerLogger();
         } else {

@@ -18,7 +18,7 @@ public final class JobTelemetryConfig implements TelemetryConfig {
     }
 
     @Override
-    public LogConfig logging() {
+    public LoggingConfig logging() {
         return this.logging;
     }
 
@@ -32,12 +32,12 @@ public final class JobTelemetryConfig implements TelemetryConfig {
         return this.metrics;
     }
 
-    private static class OperationLogConfig implements LogConfig {
-        private final LogConfig client;
+    private static class OperationLogConfig implements LoggingConfig {
+        private final LoggingConfig client;
         @Nullable
-        private final LogConfig job;
+        private final LoggingConfig job;
 
-        private OperationLogConfig(LogConfig client, @Nullable LogConfig job) {
+        private OperationLogConfig(LoggingConfig client, @Nullable LoggingConfig job) {
             this.client = Objects.requireNonNull(client);
             this.job = job;
         }

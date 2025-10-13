@@ -8,12 +8,12 @@ import java.util.Objects;
 public interface DataBaseLoggerFactory {
 
     @Nullable
-    DataBaseLogger get(TelemetryConfig.LogConfig logging, String poolName);
+    DataBaseLogger get(TelemetryConfig.LoggingConfig logging, String poolName);
 
     final class DefaultDataBaseLoggerFactory implements DataBaseLoggerFactory {
         @Override
         @Nullable
-        public DataBaseLogger get(TelemetryConfig.LogConfig logging, String poolName) {
+        public DataBaseLogger get(TelemetryConfig.LoggingConfig logging, String poolName) {
             if (Objects.requireNonNullElse(logging.enabled(), false)) {
                 return new DefaultDataBaseLogger(poolName);
             } else {

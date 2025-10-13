@@ -8,5 +8,5 @@ import java.util.Properties;
 
 public interface KafkaProducerLoggerFactory {
     @Nullable
-    KafkaProducerLogger get(TelemetryConfig.LogConfig logging, Producer<?, ?> producer, Properties properties);
+    KafkaProducerLogger get(TelemetryConfig.LoggingConfig logging, Producer<?, ?> producer, Properties properties);
 }

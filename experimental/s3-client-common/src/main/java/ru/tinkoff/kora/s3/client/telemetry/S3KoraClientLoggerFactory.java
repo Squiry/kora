@@ -6,5 +6,5 @@ import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 public interface S3KoraClientLoggerFactory {
 
     @Nullable
-    S3KoraClientLogger get(TelemetryConfig.LogConfig logging, Class<?> clientImpl);
+    S3KoraClientLogger get(TelemetryConfig.LoggingConfig logging, Class<?> clientImpl);
 }

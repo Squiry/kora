@@ -10,7 +10,6 @@ import ru.tinkoff.kora.opentelemetry.module.db.OpentelemetryDataBaseTracerFactor
 import ru.tinkoff.kora.opentelemetry.module.grpc.client.OpentelemetryGrpcClientTracerFactory;
 import ru.tinkoff.kora.opentelemetry.module.grpc.server.OpentelemetryGrpcServerTracer;
 import ru.tinkoff.kora.opentelemetry.module.http.client.OpentelemetryHttpClientTracerFactory;
-import ru.tinkoff.kora.opentelemetry.module.http.server.OpentelemetryHttpServerTracerFactory;
 import ru.tinkoff.kora.opentelemetry.module.jms.consumer.OpentelemetryJmsConsumerTracer;
 import ru.tinkoff.kora.opentelemetry.module.kafka.consumer.OpentelemetryKafkaConsumerTracerFactory;
 import ru.tinkoff.kora.opentelemetry.module.kafka.consumer.OpentelemetryKafkaProducerTracerFactory;

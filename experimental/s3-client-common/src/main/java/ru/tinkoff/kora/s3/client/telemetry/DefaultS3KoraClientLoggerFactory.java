@@ -7,7 +7,7 @@ import java.util.Objects;
 public class DefaultS3KoraClientLoggerFactory implements S3KoraClientLoggerFactory {
 
     @Override
-    public S3KoraClientLogger get(TelemetryConfig.LogConfig logging, Class<?> clientImpl) {
+    public S3KoraClientLogger get(TelemetryConfig.LoggingConfig logging, Class<?> clientImpl) {
         if (Objects.requireNonNullElse(logging.enabled(), false)) {
             return new DefaultS3KoraClientLogger(clientImpl);
         } else {

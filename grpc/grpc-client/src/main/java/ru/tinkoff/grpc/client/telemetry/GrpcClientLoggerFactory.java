@@ -8,5 +8,5 @@ import java.net.URI;
 
 public interface GrpcClientLoggerFactory {
     @Nullable
-    GrpcClientLogger get(ServiceDescriptor service, TelemetryConfig.LogConfig config, URI uri);
+    GrpcClientLogger get(ServiceDescriptor service, TelemetryConfig.LoggingConfig config, URI uri);
 }

@@ -1,5 +1,7 @@
 dependencies {
     api project(':config:config-common')
+    api project(':opentelemetry:opentelemetry-common')
+    api project(':micrometer:micrometer-module')
 
     annotationProcessor project(':config:config-annotation-processor')
 }

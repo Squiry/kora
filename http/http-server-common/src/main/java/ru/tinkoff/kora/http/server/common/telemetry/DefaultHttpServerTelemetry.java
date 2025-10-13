@@ -1,72 +1,72 @@
 package ru.tinkoff.kora.http.server.common.telemetry;
 
-import jakarta.annotation.Nullable;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.semconv.HttpAttributes;
+import io.opentelemetry.semconv.ServerAttributes;
+import io.opentelemetry.semconv.UrlAttributes;
+import ru.tinkoff.kora.http.server.common.HttpServerRequest;
 import ru.tinkoff.kora.http.server.common.router.PublicApiRequest;
 
+import java.util.concurrent.TimeUnit;
+
 public final class DefaultHttpServerTelemetry implements HttpServerTelemetry {
-    private static final String UNMATCHED_ROUTE_TEMPLATE = "UNKNOWN_ROUTE";
 
-    @Nullable
-    private final HttpServerMetrics metrics;
-    @Nullable
-    private final HttpServerLogger logger;
-    @Nullable
-    private final HttpServerTracer tracer;
+    private final Tracer tracer;
+    private final DefaultHttpServerMetrics metrics;
+    private final DefaultHttpServerLogger logger;
 
-    public DefaultHttpServerTelemetry(@Nullable HttpServerMetrics metrics, @Nullable HttpServerLogger logger, @Nullable HttpServerTracer tracer) {
-        this.metrics = metrics;
-        this.logger = logger;
-        this.tracer = tracer;
+    public DefaultHttpServerTelemetry(HttpServerTelemetryConfig config, MeterRegistry meterRegistry, Tracer tracer) {
+        if (config.metrics().enabled() == Boolean.TRUE) {
+            this.metrics = new DefaultHttpServerMetrics(meterRegistry, null, config.metrics());
+        } else {
+            this.metrics = null;
+        }
+        if (config.logging().enabled() == Boolean.TRUE) {
+            this.logger = new DefaultHttpServerLogger(config.logging());
+        } else {
+            this.logger = null;
+        }
+        if (config.tracing().enabled() == Boolean.TRUE) {
+            this.tracer = tracer;
+        } else {
+            this.tracer = null;
+        }
     }
 
     @Override
-    public HttpServerTelemetryContext get(PublicApiRequest request, @Nullable String routeTemplate) {
+    public HttpServerObservation observe(PublicApiRequest publicApiRequest, HttpServerRequest request) {
         var metrics = this.metrics;
         var logger = this.logger;
-        var tracer = this.tracer;
-        if (metrics == null && tracer == null && (logger == null || !logger.isEnabled())) {
-            return EMPTY_CTX;
-        }
-
-        var start = System.nanoTime();
         var method = request.method();
-        var scheme = request.scheme();
-        var host = request.hostName();
         if (metrics != null) {
-            var pathTemplate = routeTemplate != null ? routeTemplate : UNMATCHED_ROUTE_TEMPLATE;
-            metrics.requestStarted(method, pathTemplate, host, scheme);
+            metrics.requestStarted(publicApiRequest, request);
         }
 
-        final HttpServerTracer.HttpServerSpan span;
-        if (routeTemplate != null) {
+        var span = request.route() == null || this.tracer == null
+            ? Span.getInvalid()
+            : this.createSpan(request.route(), publicApiRequest);
+        if (request.route() != null) {
             if (logger != null) {
-                logger.logStart(method, request.path(), routeTemplate, request.queryParams(), request.headers());
+                logger.logStart(method, request.path(), request.route(), request.queryParams(), request.headers());
             }
-            if (tracer != null) {
-                span = tracer.createSpan(routeTemplate, request);
-            } else {
-                span = null;
-            }
-        } else {
-            span = null;
         }
-
-        return (statusCode, resultCode, httpHeaders, exception) -> {
-            var end = System.nanoTime();
-            var processingTime = end - start;
-            if (metrics != null) {
-                var pathTemplate = routeTemplate != null ? routeTemplate : UNMATCHED_ROUTE_TEMPLATE;
-                metrics.requestFinished(statusCode, resultCode, scheme, host, method, pathTemplate, httpHeaders, processingTime, exception);
-            }
-
-            if (routeTemplate != null) {
-                if (logger != null) {
-                    logger.logEnd(statusCode, resultCode, method, request.path(), routeTemplate, processingTime, request.queryParams(), httpHeaders, exception);
-                }
-                if (span != null) {
-                    span.close(statusCode, resultCode, exception);
-                }
-            }
-        };
+        return new DefaultHttpServerObservation(publicApiRequest, request, span, logger, metrics);
     }
+
+    public Span createSpan(String template, PublicApiRequest routerRequest) {
+        return this.tracer
+            .spanBuilder(routerRequest.method() + " " + template)
+            .setSpanKind(SpanKind.SERVER)
+            .setAttribute(HttpAttributes.HTTP_REQUEST_METHOD, routerRequest.method())
+            .setAttribute(UrlAttributes.URL_SCHEME, routerRequest.scheme())
+            .setAttribute(ServerAttributes.SERVER_ADDRESS, routerRequest.hostName())
+            .setAttribute(UrlAttributes.URL_PATH, routerRequest.path())
+            .setAttribute(HttpAttributes.HTTP_ROUTE, template)
+            .setStartTimestamp(routerRequest.requestStartTime(), TimeUnit.NANOSECONDS)
+            .startSpan();
+    }
+
 }

@@ -14,18 +14,14 @@ import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.common.header.MutableHttpHeaders;
 import ru.tinkoff.kora.http.server.common.HttpServer;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-public class Slf4jHttpServerLoggerTests {
+public class DefaultHttpServerLoggerTests {
 
     private static final MutableHttpHeaders HEADERS = HttpHeaders.of("authorization", "auth", "OtherHeader", "val");
     private static final Map<String, ? extends Collection<String>> QUERY_PARAMS = new LinkedHashMap<>() {{
@@ -49,7 +45,7 @@ public class Slf4jHttpServerLoggerTests {
                      String expectedMessage, Object... expectedArgs) {
         expectLogLevel(level);
 
-        Slf4jHttpServerLogger logger = new Slf4jHttpServerLogger(
+        DefaultHttpServerLogger logger = new DefaultHttpServerLogger(
             true, MASKED_QUERY_PARAMS, MASKED_HEADERS, "***", pathTemplate);
 
         logger.logStart("POST", "/path/1", "/path/{id}", queryParams, headers);
@@ -67,7 +63,7 @@ public class Slf4jHttpServerLoggerTests {
                                        String expectedMessage, Object... expectedArgs) {
         expectLogLevel(level);
 
-        Slf4jHttpServerLogger logger = new Slf4jHttpServerLogger(
+        DefaultHttpServerLogger logger = new DefaultHttpServerLogger(
             true, MASKED_QUERY_PARAMS, MASKED_HEADERS, "***", pathTemplate);
 
         logger.logEnd(200, HttpResultCode.SUCCESS, "POST", "/path/1", "/path/{id}", 100,
@@ -86,7 +82,7 @@ public class Slf4jHttpServerLoggerTests {
                                          String expectedMessage, Object... expectedArgs) {
         expectLogLevel(Level.WARN);
 
-        Slf4jHttpServerLogger logger = new Slf4jHttpServerLogger(
+        DefaultHttpServerLogger logger = new DefaultHttpServerLogger(
             stacktrace, MASKED_QUERY_PARAMS, MASKED_HEADERS, "***", pathTemplate);
 
         logger.logEnd(200, HttpResultCode.SUCCESS, "POST", "/path/1", "/path/{id}", 100,

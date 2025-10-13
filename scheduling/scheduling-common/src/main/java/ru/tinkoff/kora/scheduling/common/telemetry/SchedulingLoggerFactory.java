@@ -5,5 +5,5 @@ import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 
 public interface SchedulingLoggerFactory {
     @Nullable
-    SchedulingLogger get(TelemetryConfig.LogConfig logging, Class<?> jobClass, String jobMethod);
+    SchedulingLogger get(TelemetryConfig.LoggingConfig logging, Class<?> jobClass, String jobMethod);
 }

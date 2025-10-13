@@ -1,10 +1,10 @@
 package ru.tinkoff.kora.logging.common.arg;
 
 import com.fasterxml.jackson.core.JsonGenerator;
+import jakarta.annotation.Nullable;
 import org.slf4j.Marker;
 import ru.tinkoff.kora.json.common.JsonWriter;
 
-import jakarta.annotation.Nullable;
 import java.util.Map;
 
 public interface StructuredArgument extends StructuredArgumentWriter {
@@ -78,5 +78,59 @@ public interface StructuredArgument extends StructuredArgumentWriter {
             }
             gen.writeEndObject();
         });
+    }
+
+    static <T> StructuredArgumentWriter value(@Nullable T value, JsonWriter<T> writer) {
+        return generator -> writer.write(generator, value);
+    }
+
+    static StructuredArgumentWriter value(StructuredArgumentWriter w) {
+        return w;
+    }
+
+    static StructuredArgumentWriter value(String value) {
+        return gen -> gen.writeString(value);
+    }
+
+    static StructuredArgumentWriter value(Integer value) {
+        return gen -> {
+            if (value == null)
+                gen.writeNull();
+            else
+                gen.writeNumber(value);
+        };
+    }
+
+    static StructuredArgumentWriter value(Long value) {
+        return gen -> {
+            if (value == null)
+                gen.writeNull();
+            else
+                gen.writeNumber(value);
+        };
+    }
+
+    static StructuredArgumentWriter value(Boolean value) {
+        return gen -> {
+            if (value == null)
+                gen.writeNull();
+            else
+                gen.writeBoolean(value);
+        };
+    }
+
+    static StructuredArgumentWriter value(Map<String, String> object) {
+        return gen -> {
+            if (object == null) {
+                gen.writeNull();
+            } else {
+                gen.writeStartObject(object);
+                for (var entry : object.entrySet()) {
+                    gen.writeFieldName(entry.getKey());
+                    gen.writeString(entry.getValue());
+                }
+                gen.writeEndObject();
+            }
+        };
     }
 }

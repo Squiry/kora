@@ -7,5 +7,5 @@ import java.util.Properties;
 
 public interface KafkaConsumerLoggerFactory<K, V> {
     @Nullable
-    KafkaConsumerLogger<K, V> get(Properties driverProperties, TelemetryConfig.LogConfig logging);
+    KafkaConsumerLogger<K, V> get(Properties driverProperties, TelemetryConfig.LoggingConfig logging);
 }
