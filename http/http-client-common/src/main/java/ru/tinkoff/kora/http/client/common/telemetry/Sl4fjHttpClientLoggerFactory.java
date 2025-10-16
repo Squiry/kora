@@ -1,6 +1,7 @@
 package ru.tinkoff.kora.http.client.common.telemetry;
 
 import org.slf4j.LoggerFactory;
+import ru.tinkoff.kora.http.client.common.telemetry.impl.DefaultHttpClientLogger;
 import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 
 import java.util.Objects;
@@ -20,13 +21,13 @@ public class Sl4fjHttpClientLoggerFactory implements HttpClientLoggerFactory {
             var requestLog = LoggerFactory.getLogger(clientName + ".request");
             var responseLog = LoggerFactory.getLogger(clientName + ".response");
             if (logging instanceof HttpClientLoggerConfig config) {
-                return new Sl4fjHttpClientLogger(requestLog, responseLog, config.maskQueries(), config.maskHeaders(), config.mask(), config.pathTemplate());
+                return new DefaultHttpClientLogger(requestLog, responseLog, config.maskQueries(), config.maskHeaders(), config.mask(), config.pathTemplate());
             } else {
                 final Set<String> maskedQueryParams = loggerConfig.maskQueries();
                 final Set<String> maskedHeaders = loggerConfig.maskHeaders();
                 final String mask = loggerConfig.mask();
                 final Boolean pathTemplate = loggerConfig.pathTemplate();
-                return new Sl4fjHttpClientLogger(requestLog, responseLog, maskedQueryParams, maskedHeaders, mask, pathTemplate);
+                return new DefaultHttpClientLogger(requestLog, responseLog, maskedQueryParams, maskedHeaders, mask, pathTemplate);
             }
         } else {
             return null;

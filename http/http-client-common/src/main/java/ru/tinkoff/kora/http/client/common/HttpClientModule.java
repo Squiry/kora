@@ -3,13 +3,11 @@ package ru.tinkoff.kora.http.client.common;
 import ru.tinkoff.kora.common.DefaultComponent;
 import ru.tinkoff.kora.config.common.Config;
 import ru.tinkoff.kora.config.common.extractor.ConfigValueExtractor;
-import ru.tinkoff.kora.http.client.common.form.FormMultipartClientRequestMapper;
-import ru.tinkoff.kora.http.client.common.form.FormUrlEncodedClientRequestMapper;
 import ru.tinkoff.kora.http.client.common.request.HttpClientRequestMapperModule;
 import ru.tinkoff.kora.http.client.common.response.HttpClientResponseMapperModule;
-import ru.tinkoff.kora.http.client.common.telemetry.*;
-
-import jakarta.annotation.Nullable;
+import ru.tinkoff.kora.http.client.common.telemetry.HttpClientTelemetryConfig;
+import ru.tinkoff.kora.http.client.common.telemetry.Sl4fjHttpClientLoggerFactory;
+import ru.tinkoff.kora.http.client.common.telemetry.impl.DefaultHttpClientTelemetryFactory;
 
 public interface HttpClientModule extends HttpClientRequestMapperModule, HttpClientResponseMapperModule, ParameterConvertersModule {
     default HttpClientConfig httpClientConfig(Config config, ConfigValueExtractor<HttpClientConfig> configValueExtractor) {
@@ -28,7 +26,7 @@ public interface HttpClientModule extends HttpClientRequestMapperModule, HttpCli
     }
 
     @DefaultComponent
-    default DefaultHttpClientTelemetryFactory defaultHttpClientTelemetryFactory(@Nullable HttpClientLoggerFactory loggerFactory, @Nullable HttpClientTracerFactory tracingFactory, @Nullable HttpClientMetricsFactory metricsFactory) {
+    default DefaultHttpClientTelemetryFactory defaultHttpClientTelemetryFactory() {
         return new DefaultHttpClientTelemetryFactory(loggerFactory, tracingFactory, metricsFactory);
     }
 

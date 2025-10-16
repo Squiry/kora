@@ -46,6 +46,5 @@ public interface HttpServerTelemetryConfig extends TelemetryConfig {
 
     @ConfigValueExtractor
     interface HttpServerTracingConfig extends TelemetryConfig.TracingConfig {
-
     }
 }

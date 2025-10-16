@@ -82,8 +82,8 @@ public class PublicApiHandler {
             this.request = request;
         }
 
-        public HttpServerResponse proceed() throws Exception {
-            return this.handler.apply(Context.current(), this.request, this.handlerFunction);
+        public HttpServerResponse proceed(HttpServerRequest request) throws Exception {
+            return this.handler.apply(Context.current(), request, this.handlerFunction);
         }
     }
 

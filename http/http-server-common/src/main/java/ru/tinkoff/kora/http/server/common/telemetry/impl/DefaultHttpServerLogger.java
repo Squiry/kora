@@ -1,4 +1,4 @@
-package ru.tinkoff.kora.http.server.common.telemetry;
+package ru.tinkoff.kora.http.server.common.telemetry.impl;
 
 import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
@@ -8,6 +8,8 @@ import org.slf4j.spi.LoggingEventBuilder;
 import ru.tinkoff.kora.http.common.HttpResultCode;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.server.common.HttpServer;
+import ru.tinkoff.kora.http.server.common.HttpServerRequest;
+import ru.tinkoff.kora.http.server.common.telemetry.HttpServerTelemetryConfig;
 import ru.tinkoff.kora.logging.common.arg.StructuredArgumentWriter;
 
 import java.util.Collection;
@@ -43,21 +45,19 @@ public class DefaultHttpServerLogger {
         return log.isWarnEnabled();
     }
 
-    public void logStart(String method,
-                         String path,
-                         String pathTemplate,
-                         Map<String, ? extends Collection<String>> queryParams,
-                         @Nullable HttpHeaders headers) {
+    public void logStart(HttpServerRequest request) {
         if (!log.isInfoEnabled()) {
             return;
         }
+        var queryParams = request.queryParams();
+        var headers = request.headers();
         if (!log.isDebugEnabled()) {
             queryParams = null;
             headers = null;
         }
         var finalQuery = queryParams;
         var finalHeaders = headers;
-        var operation = getOperation(method, path, pathTemplate);
+        var operation = getOperation(request.method(), request.path(), request.route());
         var arg = (StructuredArgumentWriter) gen -> {
             gen.writeStartObject();
             gen.writeStringField("operation", operation);
@@ -74,26 +74,15 @@ public class DefaultHttpServerLogger {
             .log("HttpServer received request");
     }
 
-    public void logEnd(int statusCode,
-                       HttpResultCode resultCode,
-                       String method,
-                       String path,
-                       String pathTemplate,
-                       long processingTime,
-                       Map<String, ? extends Collection<String>> queryParams,
-                       @Nullable HttpHeaders headers,
-                       @Nullable Throwable exception) {
+    public void logEnd(HttpServerRequest request, int statusCode, HttpResultCode resultCode, long processingTime, @Nullable HttpHeaders headers, @Nullable Throwable exception) {
         if (!log.isWarnEnabled()) {
             return;
         }
-
         if (!log.isDebugEnabled()) {
-            queryParams = null;
             headers = null;
         }
-        var finalQuery = queryParams;
         var finalHeaders = headers;
-        var operation = getOperation(method, path, pathTemplate);
+        var operation = getOperation(request.method(), request.path(), request.route());
 
         var w = (StructuredArgumentWriter) gen -> {
             gen.writeStartObject();
@@ -101,9 +90,6 @@ public class DefaultHttpServerLogger {
             gen.writeStringField("resultCode", resultCode.string());
             gen.writeNumberField("processingTime", processingTime / 1_000_000);
             gen.writeNumberField("statusCode", statusCode);
-            if (finalQuery != null && !finalQuery.isEmpty()) {
-                gen.writeStringField("queryParams", toMaskedString(finalQuery));
-            }
             if (finalHeaders != null && !finalHeaders.isEmpty()) {
                 gen.writeStringField("headers", toMaskedString(finalHeaders));
             }

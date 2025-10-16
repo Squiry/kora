@@ -15,17 +15,14 @@ public class OpentelemetryMicrometerHttpClientTagsProvider implements Micrometer
 
     @Override
     public List<Tag> getDurationTags(DurationKey key, HttpResultCode resultCode, HttpHeaders headers) {
-        final String statusCodeStr = Integer.toString(key.statusCode());
-
+        var statusCodeStr = Integer.toString(key.statusCode());
         var tags = new ArrayList<Tag>(7);
-
         tags.add(Tag.of(HttpAttributes.HTTP_REQUEST_METHOD.getKey(), key.method()));
         tags.add(Tag.of(HttpAttributes.HTTP_RESPONSE_STATUS_CODE.getKey(), statusCodeStr));
         tags.add(Tag.of(ServerAttributes.SERVER_ADDRESS.getKey(), key.host()));
         tags.add(Tag.of(UrlAttributes.URL_SCHEME.getKey(), key.scheme()));
         tags.add(Tag.of(HttpAttributes.HTTP_ROUTE.getKey(), key.target()));
         tags.add(Tag.of("http.status_code", statusCodeStr));
-
         if (key.errorType() != null) {
             tags.add(Tag.of(ErrorAttributes.ERROR_TYPE.getKey(), key.errorType().getCanonicalName()));
         } else {

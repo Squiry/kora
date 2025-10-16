@@ -7,6 +7,7 @@ import okhttp3.internal.http.HttpMethod;
 import ru.tinkoff.kora.http.client.common.*;
 import ru.tinkoff.kora.http.client.common.request.HttpClientRequest;
 import ru.tinkoff.kora.http.client.common.response.HttpClientResponse;
+import ru.tinkoff.kora.http.client.common.telemetry.HttpClientTelemetry;
 
 import java.io.IOException;
 
@@ -19,19 +20,22 @@ public final class OkHttpClient implements HttpClient {
 
     @Override
     public HttpClientResponse execute(HttpClientRequest request) {
+        var telemetry = HttpClientTelemetry.VALUE.orElse(HttpClientTelemetry.NOOP);
+        var observation = telemetry.observe(request);
         try {
+            var observedRequest = observation.observeRequest(request);
             var b = new Request.Builder();
-            b.method(request.method(), toRequestBody(request))
-                .url(request.uri().toURL());
-            for (var header : request.headers()) {
+            b.method(observedRequest.method(), toRequestBody(observedRequest))
+                .url(observedRequest.uri().toURL());
+            for (var header : observedRequest.headers()) {
                 for (var headerValue : header.getValue()) {
                     b.addHeader(header.getKey(), headerValue);
                 }
             }
             var okHttpRequest = b.build();
             var okHttpClient = this.client;
-            if (request.requestTimeout() != null) {
-                okHttpClient = okHttpClient.newBuilder().callTimeout(request.requestTimeout()).build();
+            if (observedRequest.requestTimeout() != null) {
+                okHttpClient = okHttpClient.newBuilder().callTimeout(observedRequest.requestTimeout()).build();
             }
             var call = okHttpClient.newCall(okHttpRequest);
             var rs = call.execute();
@@ -48,6 +52,8 @@ public final class OkHttpClient implements HttpClient {
             throw new HttpClientConnectionException(t);
         } catch (Throwable t) {
             throw new HttpClientUnknownException(t);
+        } finally {
+            observation.end();
         }
     }
 

@@ -6,8 +6,6 @@ import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.context.propagation.TextMapSetter;
 import io.undertow.UndertowMessages;
 import io.undertow.io.BufferWritableOutputStream;
-import io.undertow.io.IoCallback;
-import io.undertow.io.Sender;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
@@ -19,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import ru.tinkoff.kora.http.common.HttpResultCode;
+import ru.tinkoff.kora.http.common.body.HttpBody;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.server.common.HttpServer;
 import ru.tinkoff.kora.http.server.common.HttpServerResponse;
@@ -51,7 +50,7 @@ public class UndertowExchangeProcessor implements HttpHandler {
     }
 
     @Override
-    public void handleRequest(HttpServerExchange exchange) throws Exception {
+    public void handleRequest(HttpServerExchange exchange) {
         var rootCtx = W3CTraceContextPropagator.getInstance().extract(Context.root(), exchange.getRequestHeaders(), HttpServerExchangeMapGetter.INSTANCE);
         ScopedValue
             .where(UndertowContext.VALUE, this.context)
@@ -78,17 +77,30 @@ public class UndertowExchangeProcessor implements HttpHandler {
                         .where(OpentelemetryContext.VALUE, ctx)
                         .where(Observation.VALUE, observation)
                         .run(() -> {
+                            HttpServerResponse response;
                             try {
-                                var response = invocation.proceed();
-                                this.sendResponse(observation, exchange, response);
+                                var httpServerRequest = observation.observeRequest(invocation.request);
+                                response = invocation.proceed(httpServerRequest);
                             } catch (Throwable e) {
-                                this.sendException(observation, exchange, e);
+                                observation.recordException(e);
+                                if (e instanceof HttpServerResponse rs) {
+                                    this.sendResponse(observation, exchange, rs);
+                                } else {
+                                    this.sendResponse(observation, exchange, HttpServerResponse.of(500, HttpBody.plaintext(Objects.requireNonNullElse(e.getMessage(), ""))));
+                                }
+                                return;
                             }
+                            this.sendResponse(observation, exchange, response);
                         });
                 } catch (Throwable exception) {
-                    log.warn("Error dropped", exception);
                     exchange.setStatusCode(500);
-                    exchange.getResponseSender().send(StandardCharsets.UTF_8.encode(Objects.requireNonNullElse(exception.getMessage(), "no message")));
+                    try {
+                        exchange.getResponseSender().send(StandardCharsets.UTF_8.encode(Objects.requireNonNullElse(exception.getMessage(), "")));
+                        exchange.getConnection().close();
+                    } catch (Exception e) {
+                        exception.addSuppressed(e);
+                    }
+                    log.warn("Error dropped", exception);
                 } finally {
                     exchange.endExchange();
                 }
@@ -98,12 +110,10 @@ public class UndertowExchangeProcessor implements HttpHandler {
 
 
     private void sendResponse(HttpServerObservation observation, HttpServerExchange exchange, HttpServerResponse httpResponse) {
+        httpResponse = observation.observeResponse(httpResponse);
         var headers = httpResponse.headers();
         exchange.setStatusCode(httpResponse.code());
         exchange.getResponseHeaders().put(Headers.SERVER, "kora/undertow");
-        observation
-            .withCode(httpResponse.code())
-            .withHeaders(httpResponse.headers());
         var body = httpResponse.body();
         if (body == null) {
             this.setHeaders(exchange.getResponseHeaders(), headers, null);
@@ -128,18 +138,15 @@ public class UndertowExchangeProcessor implements HttpHandler {
                 body.write(os);
             }
         } catch (Throwable e) {
+            observation.recordException(e);
             if (!exchange.isResponseStarted()) {
-                observation.withCode(500)
-                    .withResultCode(HttpResultCode.SERVER_ERROR)
-                    .withError(e);
+                observation.observeResponse(HttpServerResponse.of(500, HttpBody.plaintext(Objects.requireNonNullElse(e.getMessage(), ""))));
                 exchange.setStatusCode(500);
                 exchange.getResponseHeaders().remove(Headers.CONTENT_LENGTH);
                 exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
                 exchange.getResponseSender().send(Objects.requireNonNullElse(e.getMessage(), ""));
             } else {
-                observation
-                    .withResultCode(HttpResultCode.CONNECTION_ERROR)
-                    .withError(e);
+                observation.recordResultCode(HttpResultCode.CONNECTION_ERROR);
             }
         }
     }
@@ -183,32 +190,6 @@ public class UndertowExchangeProcessor implements HttpHandler {
                 outputStream.write(pooled.getBuffer().array(), pooled.getBuffer().arrayOffset(), toRead);
             }
         }
-    }
-
-    private void sendException(HttpServerObservation observation, HttpServerExchange exchange, Throwable error) {
-        if (error instanceof HttpServerResponse rs) {
-            observation.withError(error);
-            this.sendResponse(observation, exchange, rs);
-            return;
-        }
-        exchange.setStatusCode(500);
-        observation
-            .withError(error)
-            .withCode(500);
-        exchange.getResponseSender().send(Objects.requireNonNullElse(error.getMessage(), "Unknown error"), StandardCharsets.UTF_8, new IoCallback() {
-            @Override
-            public void onComplete(HttpServerExchange exchange, Sender sender) {
-                observation.end();
-                IoCallback.END_EXCHANGE.onComplete(exchange, sender);
-            }
-
-            @Override
-            public void onException(HttpServerExchange exchange, Sender sender, IOException exception) {
-                error.addSuppressed(exception);
-                observation.withResultCode(HttpResultCode.CONNECTION_ERROR).end();
-                IoCallback.END_EXCHANGE.onException(exchange, sender, exception);
-            }
-        });
     }
 
     private static class HttpServerExchangeMapGetter implements TextMapGetter<HeaderMap>, TextMapSetter<HeaderMap> {

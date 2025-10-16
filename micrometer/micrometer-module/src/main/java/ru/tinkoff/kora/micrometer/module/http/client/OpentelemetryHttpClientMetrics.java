@@ -3,7 +3,6 @@ package ru.tinkoff.kora.micrometer.module.http.client;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.Nullable;
-import ru.tinkoff.kora.http.client.common.telemetry.HttpClientMetrics;
 import ru.tinkoff.kora.http.common.HttpResultCode;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.micrometer.module.http.client.tag.DurationKey;

@@ -1,5 +1,7 @@
 package ru.tinkoff.kora.http.server.common;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.trace.Tracer;
 import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.application.graph.All;
 import ru.tinkoff.kora.application.graph.PromiseOf;
@@ -12,8 +14,9 @@ import ru.tinkoff.kora.config.common.Config;
 import ru.tinkoff.kora.config.common.extractor.ConfigValueExtractor;
 import ru.tinkoff.kora.http.server.common.handler.HttpServerRequestHandler;
 import ru.tinkoff.kora.http.server.common.router.PublicApiHandler;
-import ru.tinkoff.kora.http.server.common.telemetry.DefaultHttpServerTelemetryFactory;
 import ru.tinkoff.kora.http.server.common.telemetry.PrivateApiMetrics;
+import ru.tinkoff.kora.http.server.common.telemetry.impl.DefaultHttpServerTelemetryFactory;
+import ru.tinkoff.kora.http.server.common.telemetry.impl.HttpServerMetricsTagsProvider;
 
 import java.util.Optional;
 
@@ -37,12 +40,7 @@ public interface HttpServerModule extends StringParameterReadersModule, HttpServ
     }
 
     @DefaultComponent
-    default Slf4jHttpServerLoggerFactory slf4jHttpServerLoggerFactory() {
-        return new Slf4jHttpServerLoggerFactory();
-    }
-
-    @DefaultComponent
-    default DefaultHttpServerTelemetryFactory defaultHttpServerTelemetryFactory(@Nullable HttpServerLoggerFactory logger, @Nullable HttpServerMetricsFactory metrics, @Nullable HttpServerTracerFactory tracer) {
-        return new DefaultHttpServerTelemetryFactory(logger, metrics, tracer);
+    default DefaultHttpServerTelemetryFactory defaultHttpServerTelemetryFactory(MeterRegistry meterRegistry, @Nullable HttpServerMetricsTagsProvider tagProvider, @Nullable Tracer tracer) {
+        return new DefaultHttpServerTelemetryFactory(meterRegistry, tagProvider, tracer);
     }
 }

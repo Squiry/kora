@@ -13,6 +13,7 @@ import ru.tinkoff.kora.http.common.HttpResultCode;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.common.header.MutableHttpHeaders;
 import ru.tinkoff.kora.http.server.common.HttpServer;
+import ru.tinkoff.kora.http.server.common.telemetry.impl.DefaultHttpServerLogger;
 
 import java.util.*;
 import java.util.stream.Stream;

@@ -2,8 +2,6 @@ package ru.tinkoff.kora.micrometer.module.http.client;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.Nullable;
-import ru.tinkoff.kora.http.client.common.telemetry.HttpClientMetrics;
-import ru.tinkoff.kora.http.client.common.telemetry.HttpClientMetricsFactory;
 import ru.tinkoff.kora.micrometer.module.http.client.tag.MicrometerHttpClientTagsProvider;
 import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 

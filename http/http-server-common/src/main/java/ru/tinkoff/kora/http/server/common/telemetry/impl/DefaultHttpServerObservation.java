@@ -1,30 +1,32 @@
-package ru.tinkoff.kora.http.server.common.telemetry;
+package ru.tinkoff.kora.http.server.common.telemetry.impl;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.semconv.HttpAttributes;
-import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.http.common.HttpResultCode;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.server.common.HttpServerRequest;
+import ru.tinkoff.kora.http.server.common.HttpServerResponse;
 import ru.tinkoff.kora.http.server.common.router.PublicApiRequest;
+import ru.tinkoff.kora.http.server.common.telemetry.HttpServerObservation;
+import ru.tinkoff.kora.http.server.common.telemetry.HttpServerTelemetryConfig;
 
-import java.util.concurrent.TimeUnit;
+import java.util.Objects;
 
 public class DefaultHttpServerObservation implements HttpServerObservation {
     private int statusCode = 0;
     private HttpResultCode resultCode;
     private HttpHeaders httpHeaders;
     private Throwable exception;
+    private final HttpServerTelemetryConfig config;
     private final PublicApiRequest publicApiRequest;
     private final HttpServerRequest request;
     private final Span span;
-    @Nullable
     private final DefaultHttpServerLogger logger;
-    @Nullable
     private final DefaultHttpServerMetrics metrics;
 
-    public DefaultHttpServerObservation(PublicApiRequest publicApiRequest, HttpServerRequest request, Span span, DefaultHttpServerLogger logger, @Nullable DefaultHttpServerMetrics metrics) {
+    public DefaultHttpServerObservation(HttpServerTelemetryConfig config, PublicApiRequest publicApiRequest, HttpServerRequest request, Span span, DefaultHttpServerLogger logger, DefaultHttpServerMetrics metrics) {
+        this.config = config;
         this.publicApiRequest = publicApiRequest;
         this.request = request;
         this.span = span;
@@ -33,32 +35,37 @@ public class DefaultHttpServerObservation implements HttpServerObservation {
     }
 
     @Override
-    public HttpServerObservation withCode(int code) {
-        if (code == 0) {
-            this.resultCode = HttpResultCode.fromStatusCode(code);
-        }
-        this.statusCode = code;
-        return this;
-    }
-
-    @Override
-    public HttpServerObservation withHeaders(HttpHeaders headers) {
-        this.httpHeaders = headers;
-        return this;
-    }
-
-    @Override
-    public HttpServerObservation withResultCode(HttpResultCode resultCode) {
+    public void recordResultCode(HttpResultCode resultCode) {
         this.resultCode = resultCode;
-        return this;
     }
 
     @Override
-    public HttpServerObservation withError(Throwable exception) {
+    public void recordException(Throwable exception) {
         this.exception = exception;
         this.span.recordException(exception);
         this.span.setStatus(StatusCode.ERROR);
-        return this;
+    }
+
+    @Override
+    public HttpServerRequest observeRequest(HttpServerRequest rq) {
+        var logger = this.logger;
+        if (this.config.metrics().enabled()) {
+            this.metrics.requestStarted(publicApiRequest, request);
+        }
+        if (request.route() != null && this.config.logging().enabled()) {
+            logger.logStart(request);
+        }
+        return rq;
+    }
+
+    @Override
+    public HttpServerResponse observeResponse(HttpServerResponse rs) {
+        this.httpHeaders = rs.headers();
+        if (this.statusCode == 0) {
+            this.resultCode = HttpResultCode.fromStatusCode(rs.code());
+        }
+        this.statusCode = rs.code();
+        return rs;
     }
 
     @Override
@@ -71,13 +78,12 @@ public class DefaultHttpServerObservation implements HttpServerObservation {
         var end = System.nanoTime();
         var processingTime = end - publicApiRequest.requestStartTime();
         if (this.metrics != null) {
-            var pathTemplate = request.route() != null ? request.route() : DefaultHttpServerMetrics.UNMATCHED_ROUTE_TEMPLATE;
-            this.metrics.requestFinished(statusCode, publicApiRequest, pathTemplate, processingTime, exception);
+            this.metrics.requestFinished(statusCode, publicApiRequest, request, processingTime, exception);
         }
-
+        var resultCode = Objects.requireNonNullElse(this.resultCode, HttpResultCode.SERVER_ERROR);
         if (request.route() != null) {
             if (this.logger != null) {
-                this.logger.logEnd(statusCode, resultCode, request.method(), request.path(), request.route(), processingTime, request.queryParams(), httpHeaders, exception);
+                this.logger.logEnd(request, statusCode, resultCode, processingTime, httpHeaders, exception);
             }
             span.setAttribute("http.response.result_code", resultCode.string());
             if (statusCode >= 500 || resultCode == HttpResultCode.CONNECTION_ERROR) {
@@ -88,7 +94,7 @@ public class DefaultHttpServerObservation implements HttpServerObservation {
             if (statusCode != 0) {
                 span.setAttribute(HttpAttributes.HTTP_RESPONSE_STATUS_CODE, statusCode);
             }
-            span.end(end, TimeUnit.NANOSECONDS);
+            span.end();
         }
     }
 }

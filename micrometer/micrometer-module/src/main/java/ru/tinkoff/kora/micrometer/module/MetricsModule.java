@@ -1,7 +1,6 @@
 package ru.tinkoff.kora.micrometer.module;
 
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.prometheus.PrometheusMeterRegistry;
 import io.opentelemetry.contrib.metrics.micrometer.CallbackRegistrar;
 import io.opentelemetry.contrib.metrics.micrometer.MicrometerMeterProvider;
 import jakarta.annotation.Nullable;
@@ -10,7 +9,6 @@ import ru.tinkoff.kora.cache.redis.lettuce.telemetry.CommandLatencyRecorderFacto
 import ru.tinkoff.kora.common.DefaultComponent;
 import ru.tinkoff.kora.common.annotation.Root;
 import ru.tinkoff.kora.http.client.common.HttpClientConfig;
-import ru.tinkoff.kora.http.server.common.HttpServerConfig;
 import ru.tinkoff.kora.micrometer.module.cache.MicrometerCacheMetrics;
 import ru.tinkoff.kora.micrometer.module.cache.caffeine.MicrometerCaffeineCacheMetricCollector;
 import ru.tinkoff.kora.micrometer.module.cache.redis.lettuce.MicrometerLettuceCommandLatencyRecorderFactory;
@@ -28,10 +26,6 @@ import ru.tinkoff.kora.micrometer.module.grpc.server.tag.MicrometerGrpcServerTag
 import ru.tinkoff.kora.micrometer.module.http.client.MicrometerHttpClientMetricsFactory;
 import ru.tinkoff.kora.micrometer.module.http.client.tag.MicrometerHttpClientTagsProvider;
 import ru.tinkoff.kora.micrometer.module.http.client.tag.OpentelemetryMicrometerHttpClientTagsProvider;
-import ru.tinkoff.kora.micrometer.module.http.server.MicrometerHttpServerMetricsFactory;
-import ru.tinkoff.kora.micrometer.module.http.server.MicrometerPrivateApiMetrics;
-import ru.tinkoff.kora.micrometer.module.http.server.tag.DefaultMicrometerHttpServerTagsProvider;
-import ru.tinkoff.kora.micrometer.module.http.server.tag.MicrometerHttpServerTagsProvider;
 import ru.tinkoff.kora.micrometer.module.jms.consumer.MicrometerJmsConsumerMetricsFactory;
 import ru.tinkoff.kora.micrometer.module.kafka.consumer.MicrometerKafkaConsumerMetricsFactory;
 import ru.tinkoff.kora.micrometer.module.kafka.consumer.tag.MicrometerKafkaConsumerTagsProvider;
@@ -55,16 +49,6 @@ public interface MetricsModule {
     }
 
     @DefaultComponent
-    default MicrometerHttpServerTagsProvider micrometerHttpServerTagsProvider(HttpServerConfig config) {
-        return new DefaultMicrometerHttpServerTagsProvider();
-    }
-
-    @DefaultComponent
-    default MicrometerHttpServerMetricsFactory micrometerHttpServerMetricsFactory(MeterRegistry meterRegistry, MicrometerHttpServerTagsProvider httpServerTagsProvider) {
-        return new MicrometerHttpServerMetricsFactory(meterRegistry, httpServerTagsProvider);
-    }
-
-    @DefaultComponent
     default MicrometerHttpClientTagsProvider micrometerHttpClientTagsProvider(HttpClientConfig httpClientConfig) {
         return new OpentelemetryMicrometerHttpClientTagsProvider();
     }
@@ -78,11 +62,6 @@ public interface MetricsModule {
     @DefaultComponent
     default MicrometerSoapClientMetricsFactory micrometerSoapClientMetricsFactory(MeterRegistry meterRegistry) {
         return new MicrometerSoapClientMetricsFactory(meterRegistry);
-    }
-
-    @DefaultComponent
-    default MicrometerPrivateApiMetrics micrometerPrivateApiMetrics(PrometheusMeterRegistry meterRegistry) {
-        return new MicrometerPrivateApiMetrics(meterRegistry);
     }
 
     @DefaultComponent

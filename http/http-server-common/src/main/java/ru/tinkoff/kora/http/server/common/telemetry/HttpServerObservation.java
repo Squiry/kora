@@ -1,15 +1,16 @@
 package ru.tinkoff.kora.http.server.common.telemetry;
 
 import ru.tinkoff.kora.http.common.HttpResultCode;
-import ru.tinkoff.kora.http.common.header.HttpHeaders;
+import ru.tinkoff.kora.http.server.common.HttpServerRequest;
+import ru.tinkoff.kora.http.server.common.HttpServerResponse;
 import ru.tinkoff.kora.telemetry.common.Observation;
 
 public interface HttpServerObservation extends Observation {
-    HttpServerObservation withCode(int code);
+    void recordResultCode(HttpResultCode resultCode);
 
-    HttpServerObservation withHeaders(HttpHeaders headers);
+    void recordException(Throwable exception);
 
-    HttpServerObservation withResultCode(HttpResultCode resultCode);
+    HttpServerRequest observeRequest(HttpServerRequest rq);
 
-    HttpServerObservation withError(Throwable exception);
+    HttpServerResponse observeResponse(HttpServerResponse rs);
 }

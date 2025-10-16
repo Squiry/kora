@@ -8,20 +8,22 @@ import org.slf4j.Logger;
 import org.slf4j.event.Level;
 import org.slf4j.spi.DefaultLoggingEventBuilder;
 import org.slf4j.spi.LoggingEventBuilder;
+import ru.tinkoff.kora.http.client.common.request.HttpClientRequest;
+import ru.tinkoff.kora.http.client.common.telemetry.impl.DefaultHttpClientLogger;
 import ru.tinkoff.kora.http.common.HttpResultCode;
+import ru.tinkoff.kora.http.common.body.HttpBody;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.common.header.MutableHttpHeaders;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
-public class Sl4fjHttpClientLoggerTests {
+public class DefaultHttpClientLoggerTests {
 
     private static final MutableHttpHeaders HEADERS = HttpHeaders.of("authorization", "auth", "OtherHeader", "val");
     private static final String QUERY_PARAMS_STR = "a=5&sessionid=abc";
@@ -41,13 +43,13 @@ public class Sl4fjHttpClientLoggerTests {
     @ParameterizedTest
     @MethodSource("getLogRequestTestsData")
     public void logRequestTests(Level level, String queryParams, HttpHeaders headers, String body, Boolean pathTemplate, String expectedMessage, Object... expectedArgs) {
-        Sl4fjHttpClientLogger logger = new Sl4fjHttpClientLogger(
+        DefaultHttpClientLogger logger = new DefaultHttpClientLogger(
             requestLogger, responseLogger, MASKED_QUERY_PARAMS, MASKED_HEADERS, "***", pathTemplate);
 
         expectLogLevel(requestLogger, level);
 
-        logger.logRequest("postMethod", "POST", "/path/1",
-                          "/path/{id}", "", queryParams, headers, body);
+        var rq = HttpClientRequest.of("postMethod", URI.create("http://test/path/1?" + queryParams), "/path/{}", headers.toMutable(), HttpBody.plaintext(body), null);
+        logger.logRequest(rq, body);
 
         verify(eventBuilder).addMarker(any());
         if (expectedArgs.length == 1) {
@@ -62,7 +64,7 @@ public class Sl4fjHttpClientLoggerTests {
     @ParameterizedTest
     @MethodSource("getLogResponseTestsData")
     public void logResponseTests(Level level, HttpHeaders headers, String body, Boolean pathTemplate, String expectedMessage, Object... expectedArgs) {
-        Sl4fjHttpClientLogger logger = new Sl4fjHttpClientLogger(
+        DefaultHttpClientLogger logger = new DefaultHttpClientLogger(
             requestLogger, responseLogger, MASKED_QUERY_PARAMS, MASKED_HEADERS, "***", pathTemplate);
 
         expectLogLevel(responseLogger, level);

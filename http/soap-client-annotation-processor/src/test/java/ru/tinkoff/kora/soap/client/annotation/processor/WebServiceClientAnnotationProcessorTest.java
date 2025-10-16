@@ -14,13 +14,13 @@ import org.slf4j.LoggerFactory;
 import ru.tinkoff.kora.annotation.processor.common.JavaCompilation;
 import ru.tinkoff.kora.http.client.common.HttpClient;
 import ru.tinkoff.kora.http.client.common.interceptor.TelemetryInterceptor;
-import ru.tinkoff.kora.http.client.common.telemetry.DefaultHttpClientTelemetry;
-import ru.tinkoff.kora.http.client.common.telemetry.Sl4fjHttpClientLogger;
+import ru.tinkoff.kora.http.client.common.telemetry.impl.DefaultHttpClientLogger;
+import ru.tinkoff.kora.http.client.common.telemetry.impl.DefaultHttpClientTelemetry;
 import ru.tinkoff.kora.http.client.jdk.JdkHttpClient;
 import ru.tinkoff.kora.soap.client.common.SoapServiceConfig;
 import ru.tinkoff.kora.soap.client.common.telemetry.DefaultSoapClientTelemetryFactory;
 import ru.tinkoff.kora.soap.client.common.telemetry.SoapClientTelemetryFactory;
-import ru.tinkoff.kora.telemetry.common.*;
+import ru.tinkoff.kora.telemetry.common.TelemetryConfig;
 
 import javax.xml.ws.Endpoint;
 import java.io.ByteArrayOutputStream;
@@ -262,7 +262,7 @@ class WebServiceClientAnnotationProcessorTest {
     private Object createClient(ClassLoader cl, String className, String url) throws Exception {
         var type = cl.loadClass(className);
         var constructor = type.getConstructor(HttpClient.class, SoapClientTelemetryFactory.class, SoapServiceConfig.class);
-        var httpClient = this.httpClient.with(new TelemetryInterceptor(new DefaultHttpClientTelemetry(null, null, new Sl4fjHttpClientLogger(log, log, Collections.emptySet(), Collections.emptySet(), "***", null))));
+        var httpClient = this.httpClient.with(new TelemetryInterceptor(new DefaultHttpClientTelemetry(null, null, new DefaultHttpClientLogger(log, log, Collections.emptySet(), Collections.emptySet(), "***", null))));
         var telemetry = new DefaultSoapClientTelemetryFactory(null, null, null);
         return constructor.newInstance(httpClient, telemetry, new SoapServiceConfig() {
             @Override

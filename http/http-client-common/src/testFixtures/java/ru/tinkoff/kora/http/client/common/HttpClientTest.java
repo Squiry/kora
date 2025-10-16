@@ -14,7 +14,7 @@ import org.mockserver.model.Header;
 import ru.tinkoff.kora.application.graph.Lifecycle;
 import ru.tinkoff.kora.http.client.common.interceptor.TelemetryInterceptor;
 import ru.tinkoff.kora.http.client.common.request.HttpClientRequest;
-import ru.tinkoff.kora.http.client.common.telemetry.DefaultHttpClientTelemetry;
+import ru.tinkoff.kora.http.client.common.telemetry.impl.DefaultHttpClientTelemetry;
 import ru.tinkoff.kora.http.common.HttpResultCode;
 import ru.tinkoff.kora.http.common.body.HttpBody;
 import ru.tinkoff.kora.http.common.body.HttpBodyOutput;
