@@ -6,15 +6,15 @@ import io.opentelemetry.context.Context;
 public interface Observation {
     ScopedValue<Observation> VALUE = ScopedValue.newInstance();
 
-    Span span();
-
     static <T extends Observation> T current(Class<T> clazz) {
         return clazz.cast(VALUE.get());
     }
 
-    void end();
+    Span span();
 
     void observeError(Throwable e);
+
+    void end();
 
     default ScopedValue.Carrier scoped() {
         return ScopedValue
