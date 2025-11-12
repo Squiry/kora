@@ -4,6 +4,7 @@ import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientException;
 import ru.tinkoff.kora.aws.s3.model.HeadObjectResult;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult;
+import ru.tinkoff.kora.http.client.common.response.HttpClientResponse;
 
 import java.util.List;
 
@@ -20,6 +21,10 @@ public interface BaseS3Client {
      */
     @Nullable
     HeadObjectResult headObject(AwsCredentials credentials, String bucket, String key, boolean required) throws S3ClientException;
+
+
+    @Nullable
+    HttpClientResponse getObject(AwsCredentials credentials, String bucket, String key, boolean required);
 
     /**
      * Removes an object from a bucket.
