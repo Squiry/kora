@@ -10,6 +10,4 @@ public interface S3ClientObservation extends Observation {
     void observeAwsRequestId(String amxRequestId);
 
     void observeAwsExtendedId(String amxRequestId);
-
-
 }

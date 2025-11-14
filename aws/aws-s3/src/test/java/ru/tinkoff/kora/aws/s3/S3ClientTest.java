@@ -12,11 +12,13 @@ import org.testcontainers.utility.DockerImageName;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientErrorException;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientResponseException;
 import ru.tinkoff.kora.aws.s3.impl.S3ClientImpl;
+import ru.tinkoff.kora.aws.s3.model.RangeData;
 import ru.tinkoff.kora.http.client.ok.OkHttpClient;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -48,6 +50,7 @@ class S3ClientTest {
         minioClient = MinioClient.builder()
             .httpClient(ok)
             .endpoint("http://" + minio.getHost() + ":" + minio.getMappedPort(9000))
+//            .endpoint("http://localhost:4444")
             .credentials("minioadmin", "minioadmin")
             .build();
         minioClient.makeBucket(MakeBucketArgs.builder()
@@ -65,6 +68,7 @@ class S3ClientTest {
     void setUp() {
         this.config = mock(S3Config.class);
         when(config.endpoint()).thenReturn("http://" + minio.getHost() + ":" + minio.getMappedPort(9000));
+//        when(config.endpoint()).thenReturn("http://localhost:4444");
         when(config.addressStyle()).thenReturn(S3Config.AddressStyle.PATH);
         when(config.region()).thenReturn("us-east-1");
         when(config.upload()).thenReturn(Mockito.mock());
@@ -158,7 +162,133 @@ class S3ClientTest {
     }
 
     @Nested
-    class Delete {
+    class GetObject {
+        @Test
+        void testInvalidAccessKey() {
+            assertThatThrownBy(() -> s3Client("test", "test").getObject(invalidCredentials, "test", UUID.randomUUID().toString(), null, true))
+                .isInstanceOf(S3ClientErrorException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "InvalidAccessKeyId")
+                .hasFieldOrPropertyWithValue("errorMessage", "The Access Key Id you provided does not exist in our records.");
+        }
+
+        @Test
+        void testInvalidSecretKey() {
+            assertThatThrownBy(() -> s3Client("minioadmin", "test").getObject(AwsCredentials.of("minioadmin", "test"), "test", UUID.randomUUID().toString(), null, true))
+                .isInstanceOf(S3ClientErrorException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "SignatureDoesNotMatch")
+                .hasFieldOrPropertyWithValue("errorMessage", "The request signature we calculated does not match the signature you provided. Check your key and signing method.");
+        }
+
+        @Test
+        void testGetObjectThrowsErrorOnUnknownObject() {
+            assertThatThrownBy(() -> s3Client().getObject(credentials, "test", UUID.randomUUID().toString(), null, true))
+                .isInstanceOf(S3ClientErrorException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "NoSuchKey")
+                .hasFieldOrPropertyWithValue("errorMessage", "The specified key does not exist.");
+        }
+
+        @Test
+        void testGetObjectThrowsErrorOnUnknownBucket() {
+            assertThatThrownBy(() -> s3Client().getObject(credentials, UUID.randomUUID().toString(), UUID.randomUUID().toString(), null, true))
+                .isInstanceOf(S3ClientErrorException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "NoSuchBucket")
+                .hasFieldOrPropertyWithValue("errorMessage", "The specified bucket does not exist");
+        }
+
+        @Test
+        void testGetOptionalObjectReturnsNullOnUnknownObjects() {
+            var object = s3Client().getObject(credentials, "test", UUID.randomUUID().toString(), null, false);
+            assertThat(object).isNull();
+        }
+
+        @Test
+        void testGetOptionalObjectReturnsNullOnUnknownBucket() {
+            var object = s3Client().getObject(credentials, UUID.randomUUID().toString(), UUID.randomUUID().toString(), null, false);
+            assertThat(object).isNull();
+        }
+
+        @Test
+        void testGetValidObject() throws Exception {
+            var key = UUID.randomUUID().toString();
+            var content = UUID.randomUUID().toString().repeat(10240).getBytes(StandardCharsets.UTF_8);
+            minioClient.putObject(PutObjectArgs.builder()
+                .bucket("test")
+                .object(key)
+                .contentType("text/plain")
+                .stream(new ByteArrayInputStream(content), content.length, -1)
+                .build());
+            try (var object = s3Client().getObject(credentials, "test", key, null, true)) {
+                assertThat(object).isNotNull();
+                try (var body = object.body()) {
+                    assertThat(body.contentLength()).isEqualTo(content.length);
+                    assertThat(body).isNotNull();
+                    assertThat(body.asInputStream().readAllBytes()).isEqualTo(content);
+                    assertThat(body.contentType()).isEqualTo("text/plain");
+                }
+            }
+        }
+
+        @Test
+        void testGetRange() throws Exception {
+            var key = UUID.randomUUID().toString();
+            var content = UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8);
+            minioClient.putObject(PutObjectArgs.builder()
+                .bucket("test")
+                .object(key)
+                .contentType("text/plain")
+                .stream(new ByteArrayInputStream(content), content.length, -1)
+                .build());
+            try (var object = s3Client().getObject(credentials, "test", key, new RangeData.Range(1, 5), true)) {
+                assertThat(object).isNotNull();
+                assertThat(object.contentRange().completeLength()).isEqualTo(content.length);
+                try (var body = object.body()) {
+                    assertThat(body.contentLength()).isEqualTo(5);
+                    assertThat(body.asInputStream().readAllBytes()).isEqualTo(Arrays.copyOfRange(content, 1, 6));
+                }
+            }
+            try (var object = s3Client().getObject(credentials, "test", key, new RangeData.StartFrom(5), true)) {
+                assertThat(object).isNotNull();
+                assertThat(object.contentRange().completeLength()).isEqualTo(content.length);
+                try (var body = object.body()) {
+                    assertThat(body.contentLength()).isEqualTo(content.length - 5);
+                    assertThat(body.asInputStream().readAllBytes()).isEqualTo(Arrays.copyOfRange(content, 5, content.length));
+                }
+            }
+            try (var object = s3Client().getObject(credentials, "test", key, new RangeData.LastN(5), true)) {
+                assertThat(object).isNotNull();
+                assertThat(object.contentRange().completeLength()).isEqualTo(content.length);
+                try (var body = object.body()) {
+                    assertThat(body.contentLength()).isEqualTo(5);
+                    assertThat(body.asInputStream().readAllBytes()).isEqualTo(Arrays.copyOfRange(content, content.length - 5, content.length));
+                }
+            }
+        }
+
+        @Test
+        void testGetOptionalValidObject() throws Exception {
+            var key = UUID.randomUUID().toString();
+            var content = UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8);
+            minioClient.putObject(PutObjectArgs.builder()
+                .bucket("test")
+                .object(key)
+                .contentType("text/plain")
+                .stream(new ByteArrayInputStream(content), content.length, -1)
+                .build());
+            try (var object = s3Client().getObject(credentials, "test", key, null, false)) {
+                assertThat(object).isNotNull();
+                try (var body = object.body()) {
+                    assertThat(body).isNotNull();
+                    assertThat(body.contentLength()).isEqualTo(content.length);
+                    assertThat(body.asInputStream().readAllBytes()).isEqualTo(content);
+                    assertThat(body.contentType()).isEqualTo("text/plain");
+                }
+            }
+        }
+
+    }
+
+    @Nested
+    class DeleteObject {
         @Test
         void testDeleteObjectSuccessOnValidObject() throws Exception {
             var key = UUID.randomUUID().toString();
@@ -256,16 +386,16 @@ class S3ClientTest {
             var key = UUID.randomUUID().toString();
 
             var uploadId = s3Client().createMultipartUpload(credentials, "test", prefix + "/" + key);
-
             assertThat(uploadId).isNotNull();
+            try {
+                var listResult = s3Client().listMultipartUploads(credentials, "test", null);
 
-            var listResult = s3Client().listMultipartUploads(credentials, "test", null);
-
-            assertThat(listResult.uploads()).hasSize(1);
-            assertThat(listResult.uploads().getFirst().uploadId()).isEqualTo(uploadId);
-            assertThat(listResult.uploads().getFirst().key()).isEqualTo(prefix + "/" + key);
-
-            s3Client().abortMultipartUpload(credentials, "test", prefix + "/" + key, uploadId);
+                assertThat(listResult.uploads()).hasSize(1);
+                assertThat(listResult.uploads().getFirst().uploadId()).isEqualTo(uploadId);
+                assertThat(listResult.uploads().getFirst().key()).isEqualTo(prefix + "/" + key);
+            } finally {
+                s3Client().abortMultipartUpload(credentials, "test", prefix + "/" + key, uploadId);
+            }
         }
 
         @Test
@@ -279,6 +409,50 @@ class S3ClientTest {
             var afterListResult = s3Client().listMultipartUploads(credentials, "test", null);
 
             assertThat(afterListResult.uploads()).isEmpty();
+        }
+
+        @Test
+        void testUploadPart() {
+            var key = UUID.randomUUID().toString();
+            var content1 = randomBytes(1024 * 1024 * 8);
+            var content2 = randomBytes(1024);
+
+            var uploadId = s3Client().createMultipartUpload(credentials, "test", key);
+            try {
+                var etag1 = s3Client().uploadPart(credentials, "test", key, uploadId, 1, os -> os.write(content1), content1.length);
+                assertThat(etag1).isNotNull();
+                var etag2 = s3Client().uploadPart(credentials, "test", key, uploadId, 2, content2, 0, content2.length);
+                assertThat(etag2).isNotNull();
+            } finally {
+                s3Client().abortMultipartUpload(credentials, "test", key, uploadId);
+            }
+        }
+
+        @Test
+        void testCompleteMultipartUpload() throws Exception {
+            var key = UUID.randomUUID().toString();
+            var content1 = randomBytes(1024 * 1024 * 8);
+            var content2 = randomBytes(1024);
+
+            var uploadId = s3Client().createMultipartUpload(credentials, "test", key);
+            try {
+                var etag1 = s3Client().uploadPart(credentials, "test", key, uploadId, 1, os -> os.write(content1), content1.length);
+                var etag2 = s3Client().uploadPart(credentials, "test", key, uploadId, 2, content2, 0, content2.length);
+
+                var etag = s3Client().completeMultipartUpload(credentials, "test", key, uploadId, List.of(etag1, etag2));
+                assertThat(etag).isNotNull();
+
+                try (var object = s3Client().getObject(credentials, "test", key);
+                     var body = object.body();
+                     var is = body.asInputStream()) {
+                    var content = is.readAllBytes();
+                    assertThat(content.length).isEqualTo(content1.length + content2.length);
+                    assertThat(Arrays.copyOfRange(content, 0, content1.length)).isEqualTo(content1);
+                    assertThat(Arrays.copyOfRange(content, content1.length, content.length)).isEqualTo(content2);
+                }
+            } finally {
+                s3Client().abortMultipartUpload(credentials, "test", key, uploadId);
+            }
         }
 
     }

@@ -2,6 +2,7 @@ package ru.tinkoff.kora.aws.s3;
 
 import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientException;
+import ru.tinkoff.kora.aws.s3.model.GetObjectResult;
 import ru.tinkoff.kora.aws.s3.model.HeadObjectResult;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult;
 
@@ -27,5 +28,9 @@ public interface S3Client extends BaseS3Client {
 
     default ListMultipartUploadsResult listMultipartUploads(AwsCredentials credentials, String bucket, @Nullable String prefix) throws S3ClientException {
         return listMultipartUploads(credentials, bucket, null, prefix, null, null);
+    }
+
+    default GetObjectResult getObject(AwsCredentials credentials, String bucket, String key) {
+        return this.getObject(credentials, bucket, key, null, true);
     }
 }

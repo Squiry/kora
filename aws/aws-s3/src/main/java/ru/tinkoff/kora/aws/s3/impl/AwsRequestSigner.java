@@ -14,12 +14,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public final class AwsRequestSigner implements AwsCredentials {
-    public static final String EMPTY_PAYLOAD_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    public static final String EMPTY_PAYLOAD_SHA256_HEX = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
     public static final SortedMap<String, String> EMPTY_QUERY = Collections.unmodifiableSortedMap(new TreeMap<>());
-    private static final ZoneId UTC = ZoneId.of("Z");
-    private static final DateTimeFormatter SIGNER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US).withZone(UTC);
-    private static final DateTimeFormatter AMZ_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'", Locale.US).withZone(UTC);
-    private static final byte[] CLRF_BYTES = "\r\n".getBytes(StandardCharsets.US_ASCII);
+    public static final ZoneId UTC = ZoneId.of("Z");
+    public static final DateTimeFormatter SIGNER_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US).withZone(UTC);
+    public static final DateTimeFormatter AMZ_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'", Locale.US).withZone(UTC);
+    public static final byte[] CLRF_BYTES = "\r\n".getBytes(StandardCharsets.US_ASCII);
 
     private final String accessKey;
     private final String secretKey;
@@ -52,11 +52,11 @@ public final class AwsRequestSigner implements AwsCredentials {
         return this.secretKey;
     }
 
-    public record SignRequestResult(String amzDate, String authorization) {
+    public record SignRequestResult(String amzDate, String authorization, String signature) {
 
     }
 
-    public SignRequestResult processRequest(String region, String service, String method, URI uri, SortedMap<String, String> queryParameters, Map<String, String> additionalHeaders, String payloadSha256) {
+    public SignRequestResult processRequest(String region, String service, String method, URI uri, SortedMap<String, String> queryParameters, Map<String, String> additionalHeaders, String payloadSha256Hex) {
         var date = ZonedDateTime.now(UTC);
         var amzDate = date.format(AMZ_DATE_FORMAT);
 
@@ -65,12 +65,13 @@ public final class AwsRequestSigner implements AwsCredentials {
         if (additionalHeaders.isEmpty()) {
             signedHeaders = "host;x-amz-content-sha256;x-amz-date";
             canonicalHeadersStr = "host:" + uri.getAuthority() + "\n"
-                + "x-amz-content-sha256:" + payloadSha256 + "\n"
+                + "x-amz-content-sha256:" + payloadSha256Hex + "\n"
                 + "x-amz-date:" + amzDate + "\n";
         } else {
             var headers = new TreeMap<String, String>();
             headers.put("host", uri.getAuthority());
             headers.put("x-amz-date", amzDate);
+            headers.put("x-amz-content-sha256", payloadSha256Hex);
             for (var entry : additionalHeaders.entrySet()) {
                 var headerName = entry.getKey().toLowerCase();
                 headers.put(headerName, entry.getValue());
@@ -105,7 +106,7 @@ public final class AwsRequestSigner implements AwsCredentials {
             + canonicalQueryStr + "\n"
             + canonicalHeadersStr + "\n"
             + signedHeaders + "\n"
-            + payloadSha256;
+            + payloadSha256Hex;
 
 
         var signerDate = date.format(SIGNER_DATE_FORMAT);
@@ -120,7 +121,7 @@ public final class AwsRequestSigner implements AwsCredentials {
         var signature = this.awsSign(region, signerDate, stringToSign);
         var authorization = "AWS4-HMAC-SHA256 Credential=" + accessKey + "/" + scope + ", SignedHeaders=" + signedHeaders + ", Signature=" + signature;
 
-        return new SignRequestResult(amzDate, authorization);
+        return new SignRequestResult(amzDate, authorization, signature);
     }
 
     private static String getCanonicalizedQueryString(SortedMap<String, String> parameters) {
@@ -141,7 +142,7 @@ public final class AwsRequestSigner implements AwsCredentials {
         return builder.toString();
     }
 
-    private String awsSign(String region, String signerDate, String stringToSign) {
+    public String awsSign(String region, String signerDate, String stringToSign) {
         var dateKey = DigestUtils.sumHmac(secretKeyMac, signerDate.getBytes(StandardCharsets.US_ASCII));
         var dateRegionKey = DigestUtils.sumHmac(dateKey, region.getBytes(StandardCharsets.US_ASCII));
         var dateRegionServiceKey = DigestUtils.sumHmac(dateRegionKey, "s3".getBytes(StandardCharsets.US_ASCII));

@@ -9,11 +9,8 @@ import ru.tinkoff.kora.aws.s3.exception.S3ClientErrorException;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientException;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientResponseException;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientUnknownException;
-import ru.tinkoff.kora.aws.s3.impl.xml.DeleteObjectsRequest;
-import ru.tinkoff.kora.aws.s3.impl.xml.DeleteObjectsResult;
-import ru.tinkoff.kora.aws.s3.impl.xml.InitiateMultipartUploadResult;
-import ru.tinkoff.kora.aws.s3.impl.xml.S3Error;
-import ru.tinkoff.kora.aws.s3.model.HeadObjectResult;
+import ru.tinkoff.kora.aws.s3.impl.xml.*;
+import ru.tinkoff.kora.aws.s3.model.*;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult.Upload;
 import ru.tinkoff.kora.aws.s3.telemetry.NoopS3ClientTelemetry;
@@ -29,6 +26,7 @@ import ru.tinkoff.kora.http.common.header.HttpHeaders;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -59,12 +57,12 @@ public class S3ClientImpl implements S3Client {
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-                var signature = signer.processRequest(this.config.region(), "s3", "HEAD", uri, Collections.emptySortedMap(), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                var signature = signer.processRequest(this.config.region(), "s3", "HEAD", uri, Collections.emptySortedMap(), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 headers.set("x-amz-date", signature.amzDate());
                 headers.set("authorization", signature.authorization());
                 headers.set("host", uri.getAuthority());
-                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var request = HttpClientRequest.of("HEAD", uri, "/{bucket}/{object}", headers, HttpBody.empty(), this.config.requestTimeout());
                 try (var rs = this.httpClient.execute(request)) {
@@ -105,6 +103,63 @@ public class S3ClientImpl implements S3Client {
             });
     }
 
+    @Nullable
+    @Override
+    public GetObjectResult getObject(AwsCredentials credentials, String bucket, String key, @Nullable RangeData range, boolean required) {
+        var observation = this.telemetry.observe("GetObject", bucket);
+        observation.observeKey(key);
+        return ScopedValue.where(Observation.VALUE, observation)
+            .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
+            .call(() -> {
+                var headers = HttpHeaders.of();
+                var uri = this.uriHelper.uri(bucket, key);
+                var signer = credentials instanceof AwsRequestSigner s
+                    ? s
+                    : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
+
+                switch (range) {
+                    case RangeData.Range(var from, var to) -> headers.add("range", "bytes=" + from + "-" + to);
+                    case RangeData.StartFrom(var from) -> headers.add("range", "bytes=" + from + "-");
+                    case RangeData.LastN(var bytes) -> headers.add("range", "bytes=-" + bytes);
+                    case null -> {}
+                }
+                var signature = signer.processRequest(this.config.region(), "s3", "GET", uri, Collections.emptySortedMap(), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
+
+                headers.set("x-amz-date", signature.amzDate());
+                headers.set("authorization", signature.authorization());
+                headers.set("host", uri.getAuthority());
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
+
+                var request = HttpClientRequest.of("GET", uri, "/{bucket}/{object}", headers, HttpBody.empty(), this.config.requestTimeout());
+                try {
+                    var rs = this.httpClient.execute(request);
+                    var amxRequestId = rs.headers().getFirst("X-Amz-Request-Id");
+                    observation.observeAwsRequestId(amxRequestId);
+                    observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
+                    if (rs.code() == 200 || rs.code() == 206) {
+                        return new GetObjectResultImpl(rs);
+                    }
+                    try (rs) {
+                        if (rs.code() == 404 && !required) {
+                            return null;
+                        }
+                        try (var body = rs.body()) {
+                            throw parseS3Exception(rs, body);
+                        }
+                    }
+                } catch (S3ClientException e) {
+                    observation.observeError(e);
+                    throw e;
+                } catch (Exception e) {
+                    observation.observeError(e);
+                    throw new S3ClientUnknownException(e);
+                } finally {
+                    observation.end();
+                }
+            });
+    }
+
+
     @Override
     public void deleteObject(AwsCredentials credentials, String bucket, String key, @Nullable String versionId) throws S3ClientException {
         var observation = this.telemetry.observe("DeleteObject", bucket);
@@ -116,13 +171,13 @@ public class S3ClientImpl implements S3Client {
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-                var signature = signer.processRequest(this.config.region(), "s3", "DELETE", uri, Collections.emptySortedMap(), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                var signature = signer.processRequest(this.config.region(), "s3", "DELETE", uri, Collections.emptySortedMap(), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var headers = HttpHeaders.of();
                 headers.set("x-amz-date", signature.amzDate());
                 headers.set("authorization", signature.authorization());
                 headers.set("host", uri.getAuthority());
-                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var request = HttpClientRequest.of("DELETE", uri, "/{bucket}/{key}", headers, HttpBody.empty(), this.config.requestTimeout());
                 try (var rs = this.httpClient.execute(request);
@@ -210,7 +265,7 @@ public class S3ClientImpl implements S3Client {
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-                var signature = signer.processRequest(this.config.region(), "s3", "POST", uri, new TreeMap<>(Map.of("uploads", "true")), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                var signature = signer.processRequest(this.config.region(), "s3", "POST", uri, new TreeMap<>(Map.of("uploads", "true")), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 if (contentEncoding != null) {
                     headers.add("content-encoding", contentEncoding);
@@ -224,7 +279,7 @@ public class S3ClientImpl implements S3Client {
                 headers.set("x-amz-date", signature.amzDate());
                 headers.set("authorization", signature.authorization());
                 headers.set("host", uri.getAuthority());
-                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var request = HttpClientRequest.of("POST", uri, "/{bucket}?uploads=true", headers, HttpBody.empty(), this.config.requestTimeout());
                 try (var rs = this.httpClient.execute(request);
@@ -260,13 +315,13 @@ public class S3ClientImpl implements S3Client {
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-                var signature = signer.processRequest(this.config.region(), "s3", "DELETE", uri, new TreeMap<>(Map.of("uploadId", uploadId)), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                var signature = signer.processRequest(this.config.region(), "s3", "DELETE", uri, new TreeMap<>(Map.of("uploadId", uploadId)), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var headers = HttpHeaders.of();
                 headers.set("x-amz-date", signature.amzDate());
                 headers.set("authorization", signature.authorization());
                 headers.set("host", uri.getAuthority());
-                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var request = HttpClientRequest.of("DELETE", uri, "/{bucket}/{key}?uploadId={uploadId}", headers, HttpBody.empty(), this.config.requestTimeout());
                 try (var rs = this.httpClient.execute(request);
@@ -275,6 +330,55 @@ public class S3ClientImpl implements S3Client {
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
                     if (rs.code() == 204) {
                         return;
+                    }
+                    throw S3ClientImpl.parseS3Exception(rs, body);
+                } catch (S3ClientException e) {
+                    observation.observeError(e);
+                    throw e;
+                } catch (Throwable e) {
+                    observation.observeError(e);
+                    throw new S3ClientUnknownException(e);
+                } finally {
+                    observation.end();
+                }
+            });
+    }
+
+    @Override
+    public String completeMultipartUpload(AwsCredentials credentials, String bucket, String key, String uploadId, List<String> etags) throws S3ClientException {
+        var observation = this.telemetry.observe("CompleteMultipartUpload", bucket);
+        observation.observeKey(key);
+        return ScopedValue.where(Observation.VALUE, observation)
+            .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
+            .call(() -> {
+                var parts = new ArrayList<CompleteMultipartUploadRequest.Part>();
+                for (int i = 0; i < etags.size(); i++) {
+                    var etag = etags.get(i);
+                    parts.add(new CompleteMultipartUploadRequest.Part(etag, i + 1, null));
+                }
+                var completeRequest = new CompleteMultipartUploadRequest(parts);
+                var xml = completeRequest.toXml();
+                var sha256 = DigestUtils.sha256(xml, 0, xml.length).hex();
+                var uri = this.uriHelper.uri(bucket, key + "?uploadId=" + uploadId);
+                var signer = credentials instanceof AwsRequestSigner s
+                    ? s
+                    : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
+                var signature = signer.processRequest(this.config.region(), "s3", "POST", uri, new TreeMap<>(Map.of("uploadId", uploadId)), Map.of(), sha256);
+
+                var headers = HttpHeaders.of();
+                headers.set("x-amz-date", signature.amzDate());
+                headers.set("authorization", signature.authorization());
+                headers.set("host", uri.getAuthority());
+                headers.set("x-amz-content-sha256", sha256);
+
+                var request = HttpClientRequest.of("POST", uri, "/{bucket}/{key}?uploadId={uploadId}", headers, HttpBody.of("text/xml", xml), this.config.requestTimeout());
+                try (var rs = this.httpClient.execute(request);
+                     var body = rs.body()) {
+                    observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
+                    observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
+                    if (rs.code() == 200) {
+                        var result = CompleteMultipartUploadResult.fromXml(body.asInputStream());
+                        return result.etag();
                     }
                     throw S3ClientImpl.parseS3Exception(rs, body);
                 } catch (S3ClientException e) {
@@ -319,12 +423,12 @@ public class S3ClientImpl implements S3Client {
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-                var signature = signer.processRequest(this.config.region(), "s3", "GET", uri, queryMap, Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                var signature = signer.processRequest(this.config.region(), "s3", "GET", uri, queryMap, Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 headers.set("x-amz-date", signature.amzDate());
                 headers.set("authorization", signature.authorization());
                 headers.set("host", uri.getAuthority());
-                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256);
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
                 var request = HttpClientRequest.of("GET", uri, "/{bucket}/{object}", headers, HttpBody.empty(), this.config.requestTimeout());
                 try (var rs = this.httpClient.execute(request)) {
@@ -361,6 +465,145 @@ public class S3ClientImpl implements S3Client {
                 }
             });
 
+    }
+
+    @Override
+    public String uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, byte[] data, int off, int len) throws S3ClientException {
+        var observation = this.telemetry.observe("UploadPart", bucket);
+        observation.observeKey(key);
+        return ScopedValue.where(Observation.VALUE, observation)
+            .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
+            .call(() -> {
+                var sha256 = DigestUtils.sha256(data, 0, len);
+                var sha256Hex = sha256.hex();
+                var sha256Base64 = sha256.base64();
+                var md5 = DigestUtils.md5(data, 0, len).base64();
+                var headersMap = Map.of(
+                    "content-length", Integer.toString(len),
+                    "content-md5", md5,
+                    "x-amz-checksum-sha256", sha256Base64
+                );
+                var queryParams = new TreeMap<String, String>();
+                queryParams.put("partNumber", Integer.toString(partNumber));
+                queryParams.put("uploadId", uploadId);
+                var uri = this.uriHelper.uri(bucket, key + "?partNumber=" + partNumber + "&uploadId=" + uploadId);
+                var httpBody = HttpBody.of(ByteBuffer.wrap(data, off, len));
+                var signer = credentials instanceof AwsRequestSigner s
+                    ? s
+                    : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
+                var signature = signer.processRequest(this.config.region(), "s3", "PUT", uri, queryParams, headersMap, sha256Hex);
+
+                var headers = HttpHeaders.of();
+                headers.set("x-amz-date", signature.amzDate());
+                headers.set("authorization", signature.authorization());
+                headers.set("host", uri.getAuthority());
+                headers.set("x-amz-content-sha256", sha256Hex);
+                headers.set("content-md5", md5);
+                headers.set("x-amz-checksum-sha256", sha256Base64);
+
+                var request = HttpClientRequest.of("PUT", uri, "/{bucket}/{key}?partNumber={partNumber}&uploadId={uploadId}", headers, httpBody, this.config.requestTimeout());
+                try (var rs = this.httpClient.execute(request);
+                     var body = rs.body()) {
+                    observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
+                    observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
+                    if (rs.code() == 200) {
+                        return rs.headers().getFirst("ETag");
+                    }
+                    throw S3ClientImpl.parseS3Exception(rs, body);
+                } catch (S3ClientException e) {
+                    observation.observeError(e);
+                    throw e;
+                } catch (Throwable e) {
+                    observation.observeError(e);
+                    throw new S3ClientUnknownException(e);
+                } finally {
+                    observation.end();
+                }
+            });
+    }
+
+    @Override
+    public String uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, ContentWriter contentWriter, long len) throws S3ClientException {
+        var observation = this.telemetry.observe("UploadPart", bucket);
+        observation.observeKey(key);
+        return ScopedValue.where(Observation.VALUE, observation)
+            .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
+            .call(() -> {
+//                var payloadSha256Hex = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD";
+                var payloadSha256Hex = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER";
+                var headersMap = Map.of(
+                    "x-amz-trailer", "x-amz-checksum-sha256",
+                    "x-amz-decoded-content-length", Long.toString(len),
+                    "expect", "100-continue",
+                    "content-encoding", "aws-chunked"
+                );
+                var queryParams = new TreeMap<String, String>();
+                queryParams.put("partNumber", Integer.toString(partNumber));
+                queryParams.put("uploadId", uploadId);
+                var uri = this.uriHelper.uri(bucket, key + "?partNumber=" + partNumber + "&uploadId=" + uploadId);
+                var signer = credentials instanceof AwsRequestSigner s
+                    ? s
+                    : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
+
+                var signature = signer.processRequest(this.config.region(), "s3", "PUT", uri, queryParams, headersMap, payloadSha256Hex);
+
+//                var baos = new ByteArrayOutputStream();
+//                try {
+//                    contentWriter.write(baos);
+//                } catch (IOException e) {
+//                    throw new RuntimeException(e);
+//                }
+//                var httpBody = new KnownSizeAwsChunkedHttpBody(
+//                    signer,
+//                    this.config.region(),
+//                    (int) this.config.upload().chunkSize().toBytes(),
+//                    "application/octet-stream",
+//                    signature.signature(),
+//                    new ByteArrayInputStream(baos.toByteArray()),
+//                    len,
+//                    null
+//                );
+//
+
+                var headers = HttpHeaders.of();
+                headers.set("x-amz-date", signature.amzDate());
+                headers.set("authorization", signature.authorization());
+                headers.set("host", uri.getAuthority());
+                headers.set("x-amz-content-sha256", payloadSha256Hex);
+                headers.set("x-amz-trailer", "x-amz-checksum-sha256");
+                headers.set("x-amz-decoded-content-length", Long.toString(len));
+                headers.set("expect", "100-continue");
+                headers.set("content-encoding", "aws-chunked");
+
+                var httpBody = new KnownSizeAwsChunkedHttpBody(
+                    signer,
+                    this.config.region(),
+                    (int) this.config.upload().chunkSize().toBytes(),
+                    "application/octet-stream",
+                    signature.signature(),
+                    contentWriter,
+                    len,
+                    null
+                );
+                var request = HttpClientRequest.of("PUT", uri, "/{bucket}/{key}?partNumber={partNumber}&uploadId={uploadId}", headers, httpBody, this.config.requestTimeout());
+                try (var rs = this.httpClient.execute(request);
+                     var body = rs.body()) {
+                    observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
+                    observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
+                    if (rs.code() == 200) {
+                        return rs.headers().getFirst("ETag");
+                    }
+                    throw S3ClientImpl.parseS3Exception(rs, body);
+                } catch (S3ClientException e) {
+                    observation.observeError(e);
+                    throw e;
+                } catch (Throwable e) {
+                    observation.observeError(e);
+                    throw new S3ClientUnknownException(e);
+                } finally {
+                    observation.end();
+                }
+            });
     }
 
     static S3ClientException parseS3Exception(HttpClientResponse rs, HttpBodyInput body) {

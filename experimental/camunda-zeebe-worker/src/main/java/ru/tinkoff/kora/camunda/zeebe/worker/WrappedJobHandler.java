@@ -19,6 +19,7 @@ final class WrappedJobHandler implements JobHandler {
     public WrappedJobHandler(ZeebeWorkerTelemetry telemetry, KoraJobWorker jobHandler) {
         this.telemetry = telemetry;
         this.jobHandler = jobHandler;
+
     }
 
     @Override
