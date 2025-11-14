@@ -2,10 +2,7 @@ package ru.tinkoff.kora.aws.s3;
 
 import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientException;
-import ru.tinkoff.kora.aws.s3.model.GetObjectResult;
-import ru.tinkoff.kora.aws.s3.model.HeadObjectResult;
-import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult;
-import ru.tinkoff.kora.aws.s3.model.RangeData;
+import ru.tinkoff.kora.aws.s3.model.*;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -109,8 +106,9 @@ public interface BaseS3Client {
      * @param off        The start offset in the data.
      * @param len        The number of bytes to write.
      * @return Entity tag for the uploaded object.
+     * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPart.html">UploadPart</a>
      */
-    String uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, byte[] data, int off, int len) throws S3ClientException;
+    UploadedPart uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, byte[] data, int off, int len) throws S3ClientException;
 
     interface ContentWriter extends Closeable {
         void write(OutputStream os) throws IOException;
@@ -129,18 +127,25 @@ public interface BaseS3Client {
      * @param contentWriter Callback for writing data to object.
      * @param len           The number of bytes to write.
      * @return Entity tag for the uploaded object.
+     * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPart.html">UploadPart</a>
      */
-    String uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, ContentWriter contentWriter, long len) throws S3ClientException;
+    UploadedPart uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, ContentWriter contentWriter, long len) throws S3ClientException;
 
     /**
      * Lists the parts that have been uploaded for a specific multipart upload.
+     * The ListParts request returns a maximum of 1,000 uploaded parts. The limit of 1,000 parts is also the default value.
+     * You can restrict the number of parts in a response by specifying the max-parts request parameter.
+     * If your multipart upload consists of more than 1,000 parts, the response returns an IsTruncated field with the value of true, and a NextPartNumberMarker element.
+     * To list remaining uploaded parts, in subsequent ListParts requests, include the part-number-marker query string parameter and set its value to the NextPartNumberMarker field value from the previous response.
      *
-     * @param bucket   The name of the bucket to which the parts are being uploaded.
-     * @param key      Object key for which the multipart upload was initiated.
-     * @param uploadId Upload ID identifying the multipart upload whose parts are being listed.
-     * @return
+     * @param bucket           The name of the bucket to which the parts are being uploaded.
+     * @param key              Object key for which the multipart upload was initiated.
+     * @param uploadId         Upload ID identifying the multipart upload whose parts are being listed.
+     * @param maxParts         Sets the maximum number of parts to return.
+     * @param partNumberMarker Specifies the part after which listing should begin. Only parts with higher part numbers will be listed.
+     * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListParts.html">ListParts</a>
      */
-    List<?> listParts(AwsCredentials credentials, String bucket, String key, String uploadId);
+    ListPartsResult listParts(AwsCredentials credentials, String bucket, String key, String uploadId, @Nullable Integer maxParts, @Nullable Integer partNumberMarker) throws S3ClientException;
 
     /**
      * This operation aborts a multipart upload. After a multipart upload is aborted, no additional parts can be uploaded using that upload ID.
@@ -162,9 +167,9 @@ public interface BaseS3Client {
      * @param bucket   The bucket name to which the upload was taking place.
      * @param key      Key of the object for which the multipart upload was initiated.
      * @param uploadId Upload ID that identifies the multipart upload.
-     * @param etags    uploaded part ETag's
+     * @param parts    uploaded parts metadata
      * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html">CompleteMultipartUpload</a>
      */
-    String completeMultipartUpload(AwsCredentials credentials, String bucket, String key, String uploadId, List<String> etags) throws S3ClientException;
+    String completeMultipartUpload(AwsCredentials credentials, String bucket, String key, String uploadId, List<UploadedPart> parts) throws S3ClientException;
 
 }

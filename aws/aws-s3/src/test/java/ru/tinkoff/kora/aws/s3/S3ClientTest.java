@@ -423,6 +423,14 @@ class S3ClientTest {
                 assertThat(etag1).isNotNull();
                 var etag2 = s3Client().uploadPart(credentials, "test", key, uploadId, 2, content2, 0, content2.length);
                 assertThat(etag2).isNotNull();
+
+                var list1 = s3Client().listParts(credentials, "test", key, uploadId, 1, null);
+                assertThat(list1.parts()).hasSize(1);
+                assertThat(list1.truncated()).isTrue();
+                assertThat(list1.nextPartNumberMarker()).isNotNull();
+                var list2 = s3Client().listParts(credentials, "test", key, uploadId, 1, list1.nextPartNumberMarker());
+                assertThat(list2.parts()).hasSize(1);
+                assertThat(list2.truncated()).isFalse();
             } finally {
                 s3Client().abortMultipartUpload(credentials, "test", key, uploadId);
             }
@@ -436,10 +444,16 @@ class S3ClientTest {
 
             var uploadId = s3Client().createMultipartUpload(credentials, "test", key);
             try {
-                var etag1 = s3Client().uploadPart(credentials, "test", key, uploadId, 1, os -> os.write(content1), content1.length);
-                var etag2 = s3Client().uploadPart(credentials, "test", key, uploadId, 2, content2, 0, content2.length);
+                var part1 = s3Client().uploadPart(credentials, "test", key, uploadId, 1, os -> os.write(content1), content1.length);
+                var part2 = s3Client().uploadPart(credentials, "test", key, uploadId, 2, content2, 0, content2.length);
 
-                var etag = s3Client().completeMultipartUpload(credentials, "test", key, uploadId, List.of(etag1, etag2));
+                var etag = s3Client().completeMultipartUpload(
+                    credentials,
+                    "test",
+                    key,
+                    uploadId,
+                    List.of(part1, part2)
+                );
                 assertThat(etag).isNotNull();
 
                 try (var object = s3Client().getObject(credentials, "test", key);
@@ -451,7 +465,7 @@ class S3ClientTest {
                     assertThat(Arrays.copyOfRange(content, content1.length, content.length)).isEqualTo(content2);
                 }
             } finally {
-                s3Client().abortMultipartUpload(credentials, "test", key, uploadId);
+                s3Client().deleteObject(credentials, "test", key, uploadId);
             }
         }
 

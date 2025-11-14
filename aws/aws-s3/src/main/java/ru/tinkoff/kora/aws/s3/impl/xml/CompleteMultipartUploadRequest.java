@@ -23,7 +23,19 @@ import java.util.List;
 //   ...
 //</CompleteMultipartUpload>
 public record CompleteMultipartUploadRequest(List<Part> parts) {
-    public record Part(String etag, int partNumber, @Nullable String checksumSha256) {}
+    public record Part(
+        @Nullable
+        String checksumCRC32,
+        @Nullable
+        String checksumCRC32C,
+        @Nullable
+        String checksumCRC64NVME,
+        @Nullable
+        String checksumSHA1,
+        @Nullable
+        String checksumSHA256,
+        String etag,
+        int partNumber) {}
 
     public byte[] toXml() {
         try (var baos = new ByteArrayOutputStream()) {
@@ -45,9 +57,29 @@ public record CompleteMultipartUploadRequest(List<Part> parts) {
             xml.writeAttribute("xmlns", "http://s3.amazonaws.com/doc/2006-03-01/");
             for (var part : this.parts) {
                 xml.writeStartElement("Part");
-                if (part.checksumSha256() != null) {
+                if  (part.checksumCRC32() != null) {
+                    xml.writeStartElement("ChecksumCRC32");
+                    xml.writeCharacters(part.checksumCRC32());
+                    xml.writeEndElement();
+                }
+                if (part.checksumCRC32C() != null) {
+                    xml.writeStartElement("ChecksumCRC32C");
+                    xml.writeCharacters(part.checksumCRC32C());
+                    xml.writeEndElement();
+                }
+                if (part.checksumCRC64NVME() != null) {
+                    xml.writeStartElement("ChecksumCRC64NVME");
+                    xml.writeCharacters(part.checksumCRC64NVME());
+                    xml.writeEndElement();
+                }
+                if (part.checksumSHA1() != null) {
+                    xml.writeStartElement("ChecksumSHA1");
+                    xml.writeCharacters(part.checksumSHA1());
+                    xml.writeEndElement();
+                }
+                if (part.checksumSHA256() != null) {
                     xml.writeStartElement("ChecksumSHA256");
-                    xml.writeCharacters(part.checksumSha256());
+                    xml.writeCharacters(part.checksumSHA256());
                     xml.writeEndElement();
                 }
                 xml.writeStartElement("ETag");

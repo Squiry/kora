@@ -13,6 +13,7 @@ import ru.tinkoff.kora.aws.s3.impl.xml.*;
 import ru.tinkoff.kora.aws.s3.model.*;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult.Upload;
+import ru.tinkoff.kora.aws.s3.model.ListPartsResult;
 import ru.tinkoff.kora.aws.s3.telemetry.NoopS3ClientTelemetry;
 import ru.tinkoff.kora.aws.s3.telemetry.S3ClientTelemetry;
 import ru.tinkoff.kora.common.telemetry.Observation;
@@ -26,6 +27,7 @@ import ru.tinkoff.kora.http.common.header.HttpHeaders;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -53,7 +55,7 @@ public class S3ClientImpl implements S3Client {
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .call(() -> {
                 var headers = HttpHeaders.of();
-                var uri = this.uriHelper.uri(bucket, key);
+                var uri = this.uriHelper.uri(bucket, key, null);
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -69,7 +71,7 @@ public class S3ClientImpl implements S3Client {
                     var amxRequestId = rs.headers().getFirst("X-Amz-Request-Id");
                     observation.observeAwsRequestId(amxRequestId);
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
                         var accessor = DateTimeFormatter.RFC_1123_DATE_TIME.parse(rs.headers().getFirst("Last-Modified"));
                         var modified = Instant.from(accessor);
                         var contentLength = rs.headers().getFirst("content-length");
@@ -80,7 +82,7 @@ public class S3ClientImpl implements S3Client {
                         var versionId = rs.headers().getFirst("x-amz-version-id");
                         return new HeadObjectResult(bucket, key, etag, contentLengthLong, versionId, modified);
                     }
-                    if (rs.code() == 404) {
+                    if (rs.code() == HttpURLConnection.HTTP_NOT_FOUND) {
                         if (required) {
                             throw new S3ClientErrorException(rs.code(), "NoSuchKey", "Object does not exist", amxRequestId);
                         } else {
@@ -112,7 +114,7 @@ public class S3ClientImpl implements S3Client {
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .call(() -> {
                 var headers = HttpHeaders.of();
-                var uri = this.uriHelper.uri(bucket, key);
+                var uri = this.uriHelper.uri(bucket, key, null);
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -136,11 +138,11 @@ public class S3ClientImpl implements S3Client {
                     var amxRequestId = rs.headers().getFirst("X-Amz-Request-Id");
                     observation.observeAwsRequestId(amxRequestId);
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200 || rs.code() == 206) {
+                    if (rs.code() == HttpURLConnection.HTTP_OK || rs.code() == HttpURLConnection.HTTP_PARTIAL) {
                         return new GetObjectResultImpl(rs);
                     }
                     try (rs) {
-                        if (rs.code() == 404 && !required) {
+                        if (rs.code() == HttpURLConnection.HTTP_NOT_FOUND && !required) {
                             return null;
                         }
                         try (var body = rs.body()) {
@@ -167,7 +169,7 @@ public class S3ClientImpl implements S3Client {
         ScopedValue.where(Observation.VALUE, observation)
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .run(() -> {
-                var uri = this.uriHelper.uri(bucket, key);
+                var uri = this.uriHelper.uri(bucket, key, null);
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -215,7 +217,7 @@ public class S3ClientImpl implements S3Client {
                 var headers = HttpHeaders.of(
                     "content-md5", bodyMd5
                 );
-                var uri = this.uriHelper.uri(bucket, "?delete=true");
+                var uri = this.uriHelper.uri(bucket, "/", "delete=true");
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -233,11 +235,11 @@ public class S3ClientImpl implements S3Client {
                      var body = rs.body()) {
                     observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
                         var ignore = DeleteObjectsResult.fromXml(body.asInputStream());
                         return;
                     }
-                    if (rs.code() == 404) { // no such bucket
+                    if (rs.code() == HttpURLConnection.HTTP_NOT_FOUND) { // no such bucket
                         return;
                     }
                     throw parseS3Exception(rs, body);
@@ -261,7 +263,7 @@ public class S3ClientImpl implements S3Client {
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .call(() -> {
                 var headers = HttpHeaders.of();
-                var uri = this.uriHelper.uri(bucket, key + "?uploads=true");
+                var uri = this.uriHelper.uri(bucket, key, "uploads=true");
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -286,7 +288,7 @@ public class S3ClientImpl implements S3Client {
                      var body = rs.body()) {
                     observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
                         var result = InitiateMultipartUploadResult.fromXml(body.asInputStream());
                         observation.observeUploadId(result.uploadId());
                         return result.uploadId();
@@ -311,7 +313,7 @@ public class S3ClientImpl implements S3Client {
         ScopedValue.where(Observation.VALUE, observation)
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .run(() -> {
-                var uri = this.uriHelper.uri(bucket, key + "?uploadId=" + uploadId);
+                var uri = this.uriHelper.uri(bucket, key, "uploadId=" + uploadId);
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -328,7 +330,7 @@ public class S3ClientImpl implements S3Client {
                      var body = rs.body()) {
                     observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 204) {
+                    if (rs.code() == HttpURLConnection.HTTP_NO_CONTENT) {
                         return;
                     }
                     throw S3ClientImpl.parseS3Exception(rs, body);
@@ -345,38 +347,47 @@ public class S3ClientImpl implements S3Client {
     }
 
     @Override
-    public String completeMultipartUpload(AwsCredentials credentials, String bucket, String key, String uploadId, List<String> etags) throws S3ClientException {
+    public String completeMultipartUpload(AwsCredentials credentials, String bucket, String key, String uploadId, List<UploadedPart> parts) throws S3ClientException {
         var observation = this.telemetry.observe("CompleteMultipartUpload", bucket);
         observation.observeKey(key);
         return ScopedValue.where(Observation.VALUE, observation)
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .call(() -> {
-                var parts = new ArrayList<CompleteMultipartUploadRequest.Part>();
-                for (int i = 0; i < etags.size(); i++) {
-                    var etag = etags.get(i);
-                    parts.add(new CompleteMultipartUploadRequest.Part(etag, i + 1, null));
+                var rqParts = new ArrayList<CompleteMultipartUploadRequest.Part>();
+                for (var part : parts) {
+                    rqParts.add(new CompleteMultipartUploadRequest.Part(
+                        part.checksumCRC32(),
+                        part.checksumCRC32C(),
+                        part.checksumCRC64NVME(),
+                        part.checksumSHA1(),
+                        part.checksumSHA256(),
+                        part.eTag(),
+                        part.partNumber()
+                    ));
                 }
-                var completeRequest = new CompleteMultipartUploadRequest(parts);
+                var completeRequest = new CompleteMultipartUploadRequest(rqParts);
                 var xml = completeRequest.toXml();
                 var sha256 = DigestUtils.sha256(xml, 0, xml.length).hex();
-                var uri = this.uriHelper.uri(bucket, key + "?uploadId=" + uploadId);
+                var uri = this.uriHelper.uri(bucket, key, "uploadId=" + uploadId);
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-                var signature = signer.processRequest(this.config.region(), "s3", "POST", uri, new TreeMap<>(Map.of("uploadId", uploadId)), Map.of(), sha256);
+                var completeSize = Long.toString(parts.stream().mapToLong(UploadedPart::size).sum());
+                var signature = signer.processRequest(this.config.region(), "s3", "POST", uri, new TreeMap<>(Map.of("uploadId", uploadId)), Map.of("x-amz-mp-object-size", completeSize), sha256);
 
                 var headers = HttpHeaders.of();
                 headers.set("x-amz-date", signature.amzDate());
                 headers.set("authorization", signature.authorization());
                 headers.set("host", uri.getAuthority());
                 headers.set("x-amz-content-sha256", sha256);
+                headers.set("x-amz-mp-object-size", completeSize);
 
                 var request = HttpClientRequest.of("POST", uri, "/{bucket}/{key}?uploadId={uploadId}", headers, HttpBody.of("text/xml", xml), this.config.requestTimeout());
                 try (var rs = this.httpClient.execute(request);
                      var body = rs.body()) {
                     observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
                         var result = CompleteMultipartUploadResult.fromXml(body.asInputStream());
                         return result.etag();
                     }
@@ -400,7 +411,7 @@ public class S3ClientImpl implements S3Client {
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .call(() -> {
                 var headers = HttpHeaders.of();
-                var query = new StringBuilder("?uploads=true");
+                var query = new StringBuilder("uploads=true");
                 var queryMap = new TreeMap<String, String>();
                 queryMap.put("uploads", "true");
                 if (keyMarker != null) {
@@ -419,7 +430,7 @@ public class S3ClientImpl implements S3Client {
                     query.append("&max-uploads=").append(maxUploads);
                     queryMap.put("max-uploads", String.valueOf(maxUploads));
                 }
-                var uri = this.uriHelper.uri(bucket, query.toString());
+                var uri = this.uriHelper.uri(bucket, "", query.toString());
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
@@ -435,7 +446,7 @@ public class S3ClientImpl implements S3Client {
                     var amxRequestId = rs.headers().getFirst("X-Amz-Request-Id");
                     observation.observeAwsRequestId(amxRequestId);
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
                         var xml = ru.tinkoff.kora.aws.s3.impl.xml.ListMultipartUploadsResult.fromXml(rs.body().asInputStream());
                         var uploads = new ArrayList<Upload>();
                         for (var upload : xml.uploads()) {
@@ -468,7 +479,7 @@ public class S3ClientImpl implements S3Client {
     }
 
     @Override
-    public String uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, byte[] data, int off, int len) throws S3ClientException {
+    public UploadedPart uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, byte[] data, int off, int len) throws S3ClientException {
         var observation = this.telemetry.observe("UploadPart", bucket);
         observation.observeKey(key);
         return ScopedValue.where(Observation.VALUE, observation)
@@ -486,7 +497,7 @@ public class S3ClientImpl implements S3Client {
                 var queryParams = new TreeMap<String, String>();
                 queryParams.put("partNumber", Integer.toString(partNumber));
                 queryParams.put("uploadId", uploadId);
-                var uri = this.uriHelper.uri(bucket, key + "?partNumber=" + partNumber + "&uploadId=" + uploadId);
+                var uri = this.uriHelper.uri(bucket, key, "partNumber=" + partNumber + "&uploadId=" + uploadId);
                 var httpBody = HttpBody.of(ByteBuffer.wrap(data, off, len));
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
@@ -506,8 +517,11 @@ public class S3ClientImpl implements S3Client {
                      var body = rs.body()) {
                     observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
-                        return rs.headers().getFirst("ETag");
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
+                        var etag = rs.headers().getFirst("ETag");
+                        return new UploadedPart(
+                            null, null, null, null, sha256Base64, etag, partNumber, len
+                        );
                     }
                     throw S3ClientImpl.parseS3Exception(rs, body);
                 } catch (S3ClientException e) {
@@ -523,13 +537,12 @@ public class S3ClientImpl implements S3Client {
     }
 
     @Override
-    public String uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, ContentWriter contentWriter, long len) throws S3ClientException {
+    public UploadedPart uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, ContentWriter contentWriter, long len) throws S3ClientException {
         var observation = this.telemetry.observe("UploadPart", bucket);
         observation.observeKey(key);
         return ScopedValue.where(Observation.VALUE, observation)
             .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
             .call(() -> {
-//                var payloadSha256Hex = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD";
                 var payloadSha256Hex = "STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER";
                 var headersMap = Map.of(
                     "x-amz-trailer", "x-amz-checksum-sha256",
@@ -540,30 +553,12 @@ public class S3ClientImpl implements S3Client {
                 var queryParams = new TreeMap<String, String>();
                 queryParams.put("partNumber", Integer.toString(partNumber));
                 queryParams.put("uploadId", uploadId);
-                var uri = this.uriHelper.uri(bucket, key + "?partNumber=" + partNumber + "&uploadId=" + uploadId);
+                var uri = this.uriHelper.uri(bucket, key, "partNumber=" + partNumber + "&uploadId=" + uploadId);
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
 
                 var signature = signer.processRequest(this.config.region(), "s3", "PUT", uri, queryParams, headersMap, payloadSha256Hex);
-
-//                var baos = new ByteArrayOutputStream();
-//                try {
-//                    contentWriter.write(baos);
-//                } catch (IOException e) {
-//                    throw new RuntimeException(e);
-//                }
-//                var httpBody = new KnownSizeAwsChunkedHttpBody(
-//                    signer,
-//                    this.config.region(),
-//                    (int) this.config.upload().chunkSize().toBytes(),
-//                    "application/octet-stream",
-//                    signature.signature(),
-//                    new ByteArrayInputStream(baos.toByteArray()),
-//                    len,
-//                    null
-//                );
-//
 
                 var headers = HttpHeaders.of();
                 headers.set("x-amz-date", signature.amzDate());
@@ -590,8 +585,84 @@ public class S3ClientImpl implements S3Client {
                      var body = rs.body()) {
                     observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
                     observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
-                    if (rs.code() == 200) {
-                        return rs.headers().getFirst("ETag");
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
+                        var etag = rs.headers().getFirst("ETag");
+                        return new UploadedPart(
+                            null, null, null, null, httpBody.sha256(), etag, partNumber, len
+                        );
+                    }
+                    throw S3ClientImpl.parseS3Exception(rs, body);
+                } catch (S3ClientException e) {
+                    observation.observeError(e);
+                    throw e;
+                } catch (Throwable e) {
+                    observation.observeError(e);
+                    throw new S3ClientUnknownException(e);
+                } finally {
+                    observation.end();
+                }
+            });
+    }
+
+    @Override
+    public ListPartsResult listParts(AwsCredentials credentials, String bucket, String key, String uploadId, @Nullable Integer maxParts, @Nullable Integer partNumberMarker) throws S3ClientException {
+        var observation = this.telemetry.observe("ListParts", bucket);
+        observation.observeKey(key);
+        return ScopedValue.where(Observation.VALUE, observation)
+            .where(OpentelemetryContext.VALUE, Context.current().with(observation.span()))
+            .call(() -> {
+                var headers = HttpHeaders.of();
+                var queryParams = new TreeMap<String, String>();
+                queryParams.put("uploadId", uploadId);
+                var query = new StringBuilder("uploadId=").append(uploadId);
+                if (maxParts != null) {
+                    var str = Integer.toString(maxParts);
+                    query.append("&max-parts=").append(str);
+                    queryParams.put("max-parts", str);
+                }
+                if (partNumberMarker != null) {
+                    var str = Integer.toString(partNumberMarker);
+                    query.append("&part-number-marker=").append(str);
+                    queryParams.put("part-number-marker", str);
+                }
+                var uri = this.uriHelper.uri(bucket, key, query.toString());
+                var signer = credentials instanceof AwsRequestSigner s
+                    ? s
+                    : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
+                var signature = signer.processRequest(this.config.region(), "s3", "GET", uri, queryParams, Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
+
+                headers.set("x-amz-date", signature.amzDate());
+                headers.set("authorization", signature.authorization());
+                headers.set("host", uri.getAuthority());
+                headers.set("x-amz-content-sha256", AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
+
+                var request = HttpClientRequest.of("GET", uri, "/{bucket}/{key}?uploadId={uploadId}", headers, HttpBody.empty(), this.config.requestTimeout());
+                try (var rs = this.httpClient.execute(request);
+                     var body = rs.body()) {
+                    observation.observeAwsRequestId(rs.headers().getFirst("X-Amz-Request-Id"));
+                    observation.observeAwsExtendedId(rs.headers().getFirst("x-amz-id-2"));
+                    if (rs.code() == HttpURLConnection.HTTP_OK) {
+                        var listPartsResult = ru.tinkoff.kora.aws.s3.impl.xml.ListPartsResult.fromXml(body.asInputStream());
+                        observation.observeUploadId(listPartsResult.uploadId());
+                        var parts = new ArrayList<UploadedPart>(listPartsResult.parts().size());
+                        for (var part : listPartsResult.parts()) {
+                            parts.add(new UploadedPart(
+                                part.checksumCRC32(),
+                                part.checksumCRC32C(),
+                                part.checksumCRC64NVME(),
+                                part.checksumSHA1(),
+                                part.checksumSHA256(),
+                                part.eTag(),
+                                part.partNumber(),
+                                part.size()
+                            ));
+                        }
+                        return new ListPartsResult(
+                            listPartsResult.partNumberMarker(),
+                            listPartsResult.nextPartNumberMarker(),
+                            listPartsResult.isTruncated(),
+                            parts
+                        );
                     }
                     throw S3ClientImpl.parseS3Exception(rs, body);
                 } catch (S3ClientException e) {
