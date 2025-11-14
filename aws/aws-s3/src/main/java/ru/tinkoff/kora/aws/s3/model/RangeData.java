@@ -7,20 +7,38 @@ package ru.tinkoff.kora.aws.s3.model;
  * @see <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-range">rfc9110</a>
  */
 public sealed interface RangeData {
+    String toRangeValue();
+
     /**
      * @param firstPosition An integer indicating the start position of the request range, inclusive
-     * @param lastPosition   An integer indicating the end position of the requested range, inclusive
+     * @param lastPosition  An integer indicating the end position of the requested range, inclusive
      */
-    record Range(long firstPosition, long lastPosition) implements RangeData {}
+    record Range(long firstPosition, long lastPosition) implements RangeData {
+        @Override
+        public String toRangeValue() {
+            return "bytes=" + firstPosition + "-" + lastPosition;
+        }
+    }
 
     /**
      * @param firstPosition An integer indicating the start position of the request range, inclusive
      */
-    record StartFrom(long firstPosition) implements RangeData {}
+    record StartFrom(long firstPosition) implements RangeData {
+        @Override
+        public String toRangeValue() {
+            return "bytes=" + firstPosition + "-";
+        }
+
+    }
 
     /**
      * @param bytes An integer indicating the number of bytes at the end of the resource, can be larger than resource size
      */
-    record LastN(long bytes) implements RangeData {}
+    record LastN(long bytes) implements RangeData {
+        @Override
+        public String toRangeValue() {
+            return "bytes=-" + bytes;
+        }
+    }
 }
 

@@ -14,6 +14,7 @@ import ru.tinkoff.kora.aws.s3.model.*;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult;
 import ru.tinkoff.kora.aws.s3.model.ListMultipartUploadsResult.Upload;
 import ru.tinkoff.kora.aws.s3.model.ListPartsResult;
+import ru.tinkoff.kora.aws.s3.model.rq.HeadObjectArgs;
 import ru.tinkoff.kora.aws.s3.telemetry.NoopS3ClientTelemetry;
 import ru.tinkoff.kora.aws.s3.telemetry.S3ClientTelemetry;
 import ru.tinkoff.kora.common.telemetry.Observation;
@@ -48,7 +49,7 @@ public class S3ClientImpl implements S3Client {
 
     @Nullable
     @Override
-    public HeadObjectResult headObject(AwsCredentials credentials, String bucket, String key, boolean required) throws S3ClientException {
+    public HeadObjectResult headObject(AwsCredentials credentials, String bucket, String key, @Nullable HeadObjectArgs args, boolean required) throws S3ClientException {
         var observation = this.telemetry.observe("HeadObject", bucket);
         observation.observeKey(key);
         return ScopedValue.where(Observation.VALUE, observation)
@@ -118,12 +119,8 @@ public class S3ClientImpl implements S3Client {
                 var signer = credentials instanceof AwsRequestSigner s
                     ? s
                     : new AwsRequestSigner(credentials.accessKey(), credentials.secretKey());
-
-                switch (range) {
-                    case RangeData.Range(var from, var to) -> headers.add("range", "bytes=" + from + "-" + to);
-                    case RangeData.StartFrom(var from) -> headers.add("range", "bytes=" + from + "-");
-                    case RangeData.LastN(var bytes) -> headers.add("range", "bytes=-" + bytes);
-                    case null -> {}
+                if (range != null) {
+                    headers.add("range", range.toRangeValue());
                 }
                 var signature = signer.processRequest(this.config.region(), "s3", "GET", uri, Collections.emptySortedMap(), Map.of(), AwsRequestSigner.EMPTY_PAYLOAD_SHA256_HEX);
 
@@ -253,6 +250,16 @@ public class S3ClientImpl implements S3Client {
                     observation.end();
                 }
             });
+    }
+
+    @Override
+    public String putObject(AwsCredentials credentials, String bucket, String key, byte[] data, int off, int len) throws S3ClientException {
+        return "";
+    }
+
+    @Override
+    public String putObject(AwsCredentials credentials, String bucket, String key, ContentWriter contentWriter, long len) throws S3ClientException {
+        return "";
     }
 
     @Override

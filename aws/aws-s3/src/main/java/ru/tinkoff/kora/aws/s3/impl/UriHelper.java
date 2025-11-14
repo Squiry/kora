@@ -36,7 +36,7 @@ public class UriHelper {
 
     public URI uri(String bucket, String key, @Nullable String query) {
         key = encodePath(key);
-        var path = "/" + key + (query == null ? "" : "?" + query);
+        var path = "/" + key + (query == null || query.isBlank() ? "" : "?" + query);
         if (this.addressStyle == S3Config.AddressStyle.PATH) {
             return URI.create(this.scheme + "://" + this.endpoint + "/" + bucket + path);
         }

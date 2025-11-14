@@ -3,6 +3,7 @@ package ru.tinkoff.kora.aws.s3;
 import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.aws.s3.exception.S3ClientException;
 import ru.tinkoff.kora.aws.s3.model.*;
+import ru.tinkoff.kora.aws.s3.model.rq.HeadObjectArgs;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -21,7 +22,7 @@ public interface BaseS3Client {
      * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html">HeadObject</a>
      */
     @Nullable
-    HeadObjectResult headObject(AwsCredentials credentials, String bucket, String key, boolean required) throws S3ClientException;
+    HeadObjectResult headObject(AwsCredentials credentials, String bucket, String key, @Nullable HeadObjectArgs args, boolean required) throws S3ClientException;
 
     /**
      * Retrieves an object from Amazon S3.
@@ -61,6 +62,31 @@ public interface BaseS3Client {
      * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html">DeleteObjects</a>
      */
     void deleteObjects(AwsCredentials credentials, String bucket, List<String> keys) throws S3ClientException;
+
+    /**
+     * Adds an object to a bucket.
+     *
+     * @param bucket The bucket name to which the PUT action was initiated.
+     * @param key    Object key for which the PUT action was initiated.
+     * @param data   The data.
+     * @param off    The start offset in the data.
+     * @param len    The number of bytes to write.
+     * @return the ETag of the uploaded object
+     * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html">PutObject</a>
+     */
+    String putObject(AwsCredentials credentials, String bucket, String key, byte[] data, int off, int len) throws S3ClientException;
+
+    /**
+     * Adds an object to a bucket.
+     *
+     * @param bucket        The bucket name to which the PUT action was initiated.
+     * @param key           Object key for which the PUT action was initiated.
+     * @param contentWriter Callback for writing data to object.
+     * @param len           The number of bytes to write.
+     * @return the ETag of the uploaded object
+     * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html">PutObject</a>
+     */
+    String putObject(AwsCredentials credentials, String bucket, String key, ContentWriter contentWriter, long len) throws S3ClientException;
 
     /**
      * This operation lists in-progress multipart uploads in a bucket.
@@ -109,13 +135,6 @@ public interface BaseS3Client {
      * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPart.html">UploadPart</a>
      */
     UploadedPart uploadPart(AwsCredentials credentials, String bucket, String key, String uploadId, int partNumber, byte[] data, int off, int len) throws S3ClientException;
-
-    interface ContentWriter extends Closeable {
-        void write(OutputStream os) throws IOException;
-
-        @Override
-        default void close() throws IOException {}
-    }
 
     /**
      * Uploads a part in a multipart upload.
@@ -168,8 +187,15 @@ public interface BaseS3Client {
      * @param key      Key of the object for which the multipart upload was initiated.
      * @param uploadId Upload ID that identifies the multipart upload.
      * @param parts    uploaded parts metadata
+     * @return the ETag of the uploaded object
      * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html">CompleteMultipartUpload</a>
      */
     String completeMultipartUpload(AwsCredentials credentials, String bucket, String key, String uploadId, List<UploadedPart> parts) throws S3ClientException;
 
+    interface ContentWriter extends Closeable {
+        void write(OutputStream os) throws IOException;
+
+        @Override
+        default void close() throws IOException {}
+    }
 }
