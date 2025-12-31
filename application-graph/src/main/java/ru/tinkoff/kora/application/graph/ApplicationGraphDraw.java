@@ -1,6 +1,7 @@
 package ru.tinkoff.kora.application.graph;
 
 import org.jspecify.annotations.Nullable;
+import ru.tinkoff.kora.application.graph.internal.CompositeConditionalNode;
 import ru.tinkoff.kora.application.graph.internal.GraphImpl;
 import ru.tinkoff.kora.application.graph.internal.NodeImpl;
 
@@ -21,40 +22,39 @@ public class ApplicationGraphDraw {
         return root;
     }
 
-    public <T> Node<T> addNode0(Type type, Class<?> tag, Graph.Factory<? extends T> factory, Node<?>... dependencies) {
-        return this.addNode0(type, tag, factory, List.of(), dependencies);
-    }
-
-    public <T> Node<T> addNode0(Type type, Class<?> tag, Graph.Factory<? extends T> factory, List<? extends Node<? extends GraphInterceptor<T>>> interceptors, Node<?>... dependencies) {
-        var dependenciesList = new ArrayList<NodeImpl<?>>();
-        for (var dependency : dependencies) {
-            dependenciesList.add((NodeImpl<?>) dependency);
-        }
-        var interceptorsList = new ArrayList<NodeImpl<? extends GraphInterceptor<T>>>();
-        for (var interceptor : interceptors) {
-            interceptorsList.add((NodeImpl<? extends GraphInterceptor<T>>) interceptor);
-        }
-        for (var dependency : dependencies) {
-            var node = (NodeImpl<?>) dependency;
-            if (node.index >= 0 && node.graphDraw != this) {
-                throw new IllegalArgumentException("Dependency is from another graph");
+    public <T> Node<T> addNode(
+        Type type,
+        @Nullable Class<?> tag,
+        @Nullable Node<? extends NodeCondition> condition,
+        List<Node<?>> createDependencies,
+        List<Node<?>> refreshDependencies,
+        List<Node<? extends GraphInterceptor<T>>> interceptors,
+        Graph.Factory<? extends T> factory) {
+        for (var dependency : createDependencies) {
+            switch (dependency) {
+                case CompositeConditionalNode<?> v -> {
+                    // todo
+                }
+                case NodeImpl<?> node -> {
+                    if (node.index >= 0 && node.graphDraw != this) {
+                        throw new IllegalArgumentException("Dependency is from another graph");
+                    }
+                }
             }
         }
 
-        var node = new NodeImpl<>(this, this.graphNodes.size(), factory, type, dependenciesList, interceptorsList, tag);
+        var node = new NodeImpl<>(
+            this,
+            type,
+            tag,
+            this.graphNodes.size(),
+            condition,
+            createDependencies,
+            refreshDependencies,
+            interceptors,
+            factory
+        );
         this.graphNodes.add(node);
-        for (var dependency : dependenciesList) {
-            if (dependency.isValueOf()) {
-                dependency.addDependentNode((NodeImpl<?>) node.valueOf());
-            } else {
-                dependency.addDependentNode(node);
-            }
-        }
-        for (var interceptor : interceptors) {
-            var n = (NodeImpl<?>) interceptor;
-            n.intercepts(node);
-        }
-
         return node;
     }
 
@@ -97,17 +97,14 @@ public class ApplicationGraphDraw {
     public <T> void replaceNode(Node<T> node, Graph.Factory<? extends T> factory) {
         var casted = (NodeImpl<T>) node;
         this.graphNodes.set(casted.index, new NodeImpl<T>(
-            this, casted.index, factory, node.type(), List.of(), List.of(), node.tag()
+            this, casted.type, casted.tag, casted.index, null, List.of(), List.of(), List.of(), factory
         ));
-        for (var graphNode : graphNodes) {
-            graphNode.deleteDependentNode(casted);
-        }
     }
 
     public <T> void replaceNodeKeepDependencies(Node<T> node, Graph.Factory<? extends T> factory) {
         var casted = (NodeImpl<T>) node;
         this.graphNodes.set(casted.index, new NodeImpl<T>(
-            this, casted.index, factory, node.type(), casted.getDependencyNodes(), List.of(), node.tag()
+            this, casted.type, casted.tag, casted.index, null, casted.createDependencies, casted.refreshDependencies, List.of(), factory
         ));
     }
 
@@ -116,12 +113,44 @@ public class ApplicationGraphDraw {
         for (var node : this.graphNodes) {
             class T {
                 static <T> void addNode(ApplicationGraphDraw draw, NodeImpl<T> node) {
-                    var dependencies = new NodeImpl<?>[node.getDependencyNodes().size()];
-                    for (int i = 0; i < dependencies.length; i++) {
-                        var dependency = node.getDependencyNodes().get(i);
-                        dependencies[i] = draw.graphNodes.get(dependency.index);
+                    var createDependencies = new ArrayList<Node<?>>(node.createDependencies.size());
+                    for (var dependency : node.createDependencies) {
+                        switch (dependency) {
+                            case CompositeConditionalNode<?> v -> {
+                                var newNode = new CompositeConditionalNode<>(v.type(), v.tag(), new ArrayList<>());
+                                for (var candidate : v.candidates) {
+                                    newNode.candidates.add(draw.graphNodes.get(candidate.index));
+                                }
+                                createDependencies.add(newNode);
+                            }
+                            case NodeImpl<?> v -> {
+                                createDependencies.add(draw.graphNodes.get(v.index));
+                            }
+                        }
                     }
-                    draw.addNode0(node.type(), node.tag(), node.factory, node.getInterceptors(), dependencies);
+                    var refreshDependencies = new ArrayList<Node<?>>(node.refreshDependencies.size());
+                    for (var dependency : node.refreshDependencies) {
+                        switch (dependency) {
+                            case CompositeConditionalNode<?> v -> {
+                                var newNode = new CompositeConditionalNode<>(v.type(), v.tag(), new ArrayList<>());
+                                for (var candidate : v.candidates) {
+                                    newNode.candidates.add(draw.graphNodes.get(candidate.index));
+                                }
+                                refreshDependencies.add(newNode);
+                            }
+                            case NodeImpl<?> v -> {
+                                refreshDependencies.add(draw.graphNodes.get(v.index));
+                            }
+                        }
+                    }
+                    var interceptors = new ArrayList<Node<? extends GraphInterceptor<T>>>(node.interceptors.size());
+                    for (var interceptor : node.interceptors) {
+                        interceptors.add((Node<? extends GraphInterceptor<T>>) draw.graphNodes.get(((NodeImpl<?>) interceptor).index));
+                    }
+                    var condition = node.condition;
+                    @SuppressWarnings("unchecked")
+                    var newCondition = condition == null ? null : (Node<? extends NodeCondition>) draw.graphNodes.get(((NodeImpl<?>) condition).index);
+                    draw.addNode(node.type(), node.tag(), newCondition, createDependencies, refreshDependencies, interceptors, node.factory);
                 }
             }
             T.addNode(draw, node);
@@ -140,12 +169,15 @@ public class ApplicationGraphDraw {
                     var dependencies = new ArrayList<Node<?>>();
                     var interceptors = new ArrayList<Node<? extends GraphInterceptor<T>>>();
                     if (!excludeTransitiveSet.contains(node.index)) {
-                        for (var dependencyNode : node.getDependencyNodes()) {
-                            dependencies.add(this.accept(dependencyNode));
+                        for (var dependencyNode : node.createDependencies) {
+                            switch (dependencyNode) {
+                                case CompositeConditionalNode<?> v -> v.candidates.forEach(candidate -> dependencies.add(this.accept(candidate)));
+                                case NodeImpl<?> v -> dependencies.add(this.accept(v));
+                            }
                         }
                     }
-                    for (var interceptor : node.getInterceptors()) {
-                        interceptors.add(this.accept(interceptor));
+                    for (var interceptor : node.interceptors) {
+                        interceptors.add(this.accept((NodeImpl<? extends GraphInterceptor<T>>) interceptor));
                     }
                     Graph.Factory<T> factory = graph -> node.factory.get(new Graph() {
                         @Override
@@ -177,7 +209,7 @@ public class ApplicationGraphDraw {
                             return graph.promiseOf(realNode);
                         }
                     });
-                    var newNode = (NodeImpl<T>) subgraph.addNode0(node.type(), node.tag(), factory, interceptors, dependencies.toArray(new Node<?>[0]));
+                    var newNode = (NodeImpl<T>) subgraph.addNode(node.type(), node.tag(), node.condition, dependencies, dependencies, interceptors, factory);// todo
                     seen.put(node.index, newNode.index);
                     return newNode;
                 }

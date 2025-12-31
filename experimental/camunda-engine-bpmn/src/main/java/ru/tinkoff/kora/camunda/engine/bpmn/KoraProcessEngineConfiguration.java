@@ -30,10 +30,7 @@ import ru.tinkoff.kora.camunda.engine.bpmn.transaction.KoraTransactionIntercepto
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static org.camunda.bpm.engine.impl.history.HistoryLevel.HISTORY_LEVEL_FULL;
@@ -56,7 +53,7 @@ public class KoraProcessEngineConfiguration extends ProcessEngineConfigurationIm
                                           IdGenerator idGenerator,
                                           JuelExpressionManager koraExpressionManager,
                                           ArtifactFactory artifactFactory,
-                                          List<ProcessEnginePlugin> plugins,
+                                          Iterable<ProcessEnginePlugin> plugins,
                                           CamundaEngineDataSource camundaEngineDataSource,
                                           CamundaEngineBpmnConfig engineConfig,
                                           KoraResolverFactory componentResolverFactory,
@@ -66,7 +63,8 @@ public class KoraProcessEngineConfiguration extends ProcessEngineConfigurationIm
         this.componentResolverFactory = componentResolverFactory;
         this.idGenerator = idGenerator;
         this.artifactFactory = artifactFactory;
-        this.plugins = plugins;
+        this.plugins = new ArrayList<>();
+        plugins.forEach(this.plugins::add);
         this.engineConfig = engineConfig;
         this.camundaEngineDataSource = camundaEngineDataSource;
         this.camundaVersion = camundaVersion;
