@@ -8,7 +8,7 @@ import ru.tinkoff.kora.application.graph.RefreshListener;
 import ru.tinkoff.kora.application.graph.ValueOf;
 import ru.tinkoff.kora.common.util.TimeUtils;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -17,10 +17,10 @@ public class KoraQuartzJobRegistrar implements Lifecycle, RefreshListener {
 
     private static final Logger logger = LoggerFactory.getLogger(KoraQuartzJobRegistrar.class);
 
-    private final List<ValueOf<KoraQuartzJob>> quartzJobList;
+    private final Collection<ValueOf<KoraQuartzJob>> quartzJobList;
     private final Scheduler scheduler;
 
-    public KoraQuartzJobRegistrar(List<ValueOf<KoraQuartzJob>> quartzJobList, Scheduler scheduler) {
+    public KoraQuartzJobRegistrar(Collection<ValueOf<KoraQuartzJob>> quartzJobList, Scheduler scheduler) {
         this.quartzJobList = quartzJobList;
         this.scheduler = scheduler;
     }

@@ -64,18 +64,18 @@ public class KoraProcessEngineTests implements CamundaEngineBpmnModule {
                 jobExecutor,
                 camundaEngineBpmnKoraTelemetryRegistry(null),
                 camundaEngineBpmnIdGenerator(),
-                camundaEngineBpmnKoraExpressionManager(camundaEngineBpmnKoraELResolver(koraDelegateWrapperFactory, All.of(), All.of())),
-                camundaEngineBpmnKoraArtifactFactory(koraDelegateWrapperFactory, All.of(), All.of()),
-                All.of(),
+                camundaEngineBpmnKoraExpressionManager(camundaEngineBpmnKoraELResolver(koraDelegateWrapperFactory, All.empty(), All.empty())),
+                camundaEngineBpmnKoraArtifactFactory(koraDelegateWrapperFactory, All.empty(), All.empty()),
+                All.empty(),
                 camundaEngineDataSource,
                 config,
-                camundaEngineBpmnKoraComponentResolverFactory(koraDelegateWrapperFactory, All.of(), All.of()),
+                camundaEngineBpmnKoraComponentResolverFactory(koraDelegateWrapperFactory, All.empty(), All.empty()),
                 camundaEngineBpmnPackageVersion()
             );
 
-            var koraProcessEngine = camundaEngineBpmnKoraProcessEngine(koraProcessEngineConfiguration,
+            var koraProcessEngine = new KoraProcessEngine(koraProcessEngineConfiguration,
                 config,
-                All.of(
+                List.of(
                     camundaEngineBpmnKoraProcessEngineTwoStageCamundaConfigurator(koraProcessEngineConfiguration, config, jobExecutor),
                     camundaEngineBpmnKoraAdminUserConfigurator(config, camundaEngineDataSource),
                     camundaEngineBpmnKoraResourceDeploymentConfigurator(config)
@@ -132,18 +132,18 @@ public class KoraProcessEngineTests implements CamundaEngineBpmnModule {
                 jobExecutor,
                 camundaEngineBpmnKoraTelemetryRegistry(null),
                 camundaEngineBpmnIdGenerator(),
-                camundaEngineBpmnKoraExpressionManager(camundaEngineBpmnKoraELResolver(koraDelegateWrapperFactory, All.of(), All.of())),
-                camundaEngineBpmnKoraArtifactFactory(koraDelegateWrapperFactory, All.of(), All.of()),
-                All.of(),
+                camundaEngineBpmnKoraExpressionManager(camundaEngineBpmnKoraELResolver(koraDelegateWrapperFactory, All.empty(), All.empty())),
+                camundaEngineBpmnKoraArtifactFactory(koraDelegateWrapperFactory, All.empty(), All.empty()),
+                All.empty(),
                 camundaEngineDataSource,
                 config,
-                camundaEngineBpmnKoraComponentResolverFactory(koraDelegateWrapperFactory, All.of(), All.of()),
+                camundaEngineBpmnKoraComponentResolverFactory(koraDelegateWrapperFactory, All.empty(), All.empty()),
                 camundaEngineBpmnPackageVersion()
             );
 
-            KoraProcessEngine koraProcessEngine = camundaEngineBpmnKoraProcessEngine(koraProcessEngineConfiguration,
+            KoraProcessEngine koraProcessEngine = new KoraProcessEngine(koraProcessEngineConfiguration,
                 config,
-                All.of(
+                List.of(
                     camundaEngineBpmnKoraAdminUserConfigurator(config, camundaEngineDataSource),
                     camundaEngineBpmnKoraResourceDeploymentConfigurator(config)
                 ),

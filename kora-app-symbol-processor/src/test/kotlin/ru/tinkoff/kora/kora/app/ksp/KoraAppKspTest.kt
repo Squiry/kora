@@ -147,7 +147,6 @@ class KoraAppKspTest {
         val graphDraw = testClass(AppWithAllOfValueOf::class)
         val node1 = graphDraw.nodes[0] as NodeImpl<*>
         val node2 = graphDraw.nodes[1]
-        assertThat(node1.dependentNodes).hasSize(1)
         val graph = graphDraw.init()
         val node1Value1 = graph[node1]
         val node2Value1 = graph[node2]

@@ -9,6 +9,8 @@ public interface Graph {
 
     <T> PromiseOf<T> promiseOf(Node<T> node);
 
+    boolean _shouldNodeBeCrated(Node<?> node);
+
     interface Factory<T> {
         T get(Graph graph) throws Exception;
     }

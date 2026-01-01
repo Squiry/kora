@@ -17,7 +17,7 @@ import ru.tinkoff.kora.common.util.TimeUtils;
 
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 import java.util.Objects;
 
 final class ZeebeManagedChannelLifecycle implements Lifecycle, Wrapped<ManagedChannel> {
@@ -29,13 +29,13 @@ final class ZeebeManagedChannelLifecycle implements Lifecycle, Wrapped<ManagedCh
     private final GrpcClientChannelFactory channelFactory;
     private final ChannelCredentials channelCredentials;
     private final GrpcClientTelemetryFactory telemetryFactory;
-    private final List<ClientInterceptor> interceptors;
+    private final Collection<ClientInterceptor> interceptors;
 
     private volatile ManagedChannel channel;
 
     public ZeebeManagedChannelLifecycle(GrpcClientConfig config,
                                         @Nullable ChannelCredentials channelCredentials,
-                                        List<ClientInterceptor> interceptors,
+                                        Collection<ClientInterceptor> interceptors,
                                         GrpcClientTelemetryFactory telemetryFactory,
                                         GrpcClientChannelFactory channelFactory,
                                         ServiceDescriptor serviceDefinition) {

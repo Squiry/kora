@@ -10,7 +10,7 @@ import ru.tinkoff.kora.application.graph.Wrapped;
 import ru.tinkoff.kora.camunda.engine.bpmn.configurator.ProcessEngineConfigurator;
 import ru.tinkoff.kora.common.util.TimeUtils;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -20,14 +20,14 @@ public final class KoraProcessEngine implements Lifecycle, Wrapped<ProcessEngine
 
     private final ProcessEngineConfiguration engineConfiguration;
     private final CamundaEngineBpmnConfig engineConfig;
-    private final List<ProcessEngineConfigurator> camundaConfigurators;
+    private final Collection<ProcessEngineConfigurator> camundaConfigurators;
     private final Executor executor;
 
     private volatile ProcessEngine processEngine;
 
     public KoraProcessEngine(ProcessEngineConfiguration engineConfiguration,
                              CamundaEngineBpmnConfig engineConfig,
-                             List<ProcessEngineConfigurator> camundaConfigurators,
+                             Collection<ProcessEngineConfigurator> camundaConfigurators,
                              Executor executor) {
         this.engineConfig = engineConfig;
         this.engineConfiguration = engineConfiguration;

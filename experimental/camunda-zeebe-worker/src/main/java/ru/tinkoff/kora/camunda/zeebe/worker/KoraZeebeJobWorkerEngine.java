@@ -15,6 +15,7 @@ import ru.tinkoff.kora.camunda.zeebe.worker.telemetry.ZeebeWorkerTelemetry;
 import ru.tinkoff.kora.camunda.zeebe.worker.telemetry.ZeebeWorkerTelemetryFactory;
 import ru.tinkoff.kora.common.util.TimeUtils;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -26,7 +27,7 @@ public final class KoraZeebeJobWorkerEngine implements Lifecycle {
     private static final Logger logger = LoggerFactory.getLogger(KoraZeebeJobWorkerEngine.class);
 
     private final ZeebeClient client;
-    private final List<KoraJobWorker> jobWorkers;
+    private final Collection<KoraJobWorker> jobWorkers;
     private final ZeebeClientConfig clientConfig;
     private final ZeebeWorkerConfig workerConfig;
     private final ZeebeBackoffFactory zeebeBackoffFactory;
@@ -36,7 +37,7 @@ public final class KoraZeebeJobWorkerEngine implements Lifecycle {
     private final List<JobWorker> workers = new CopyOnWriteArrayList<>();
 
     public KoraZeebeJobWorkerEngine(ZeebeClient client,
-                                    List<KoraJobWorker> jobWorkers,
+                                    Collection<KoraJobWorker> jobWorkers,
                                     ZeebeClientConfig clientConfig,
                                     ZeebeWorkerConfig workerConfig,
                                     ZeebeBackoffFactory zeebeBackoffFactory,

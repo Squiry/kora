@@ -12,7 +12,6 @@ import ru.tinkoff.kora.annotation.processor.common.TestUtils.CompilationErrorExc
 import ru.tinkoff.kora.annotation.processor.common.TestUtils.ProcessorOptions;
 import ru.tinkoff.kora.application.graph.ApplicationGraphDraw;
 import ru.tinkoff.kora.application.graph.Node;
-import ru.tinkoff.kora.application.graph.internal.NodeImpl;
 import ru.tinkoff.kora.common.Tag;
 import ru.tinkoff.kora.kora.app.annotation.processor.app.*;
 
@@ -68,11 +67,6 @@ class KoraAppProcessorTest {
     }
 
     @Test
-    void testAutocreateComponent() throws Throwable {
-        testClass(AppWithAutocreateComponent.class);
-    }
-
-    @Test
     void testAppWithTags() throws Throwable {
         testClass(AppWithTag.class);
     }
@@ -99,7 +93,6 @@ class KoraAppProcessorTest {
         var graphDraw = testClass(AppWithAllOfValueOf.class);
         var node1 = graphDraw.getNodes().get(0);
         var node2 = graphDraw.getNodes().get(1);
-        assertThat(((NodeImpl<?>) node1).getDependentNodes()).hasSize(1);
 
         var graph = graphDraw.init();
 
@@ -314,12 +307,6 @@ class KoraAppProcessorTest {
     void appWithExactDependencyMatch() throws Exception {
         var graphDraw = testClass(AppWithExactMatch.class);
         Assertions.assertThat(graphDraw.getNodes()).hasSize(8);
-    }
-
-    @Test
-    void appWithComponentsWithSameName() throws Exception {
-        var graphDraw = testClass(AppWithComponentsWithSameName.class);
-        Assertions.assertThat(graphDraw.getNodes()).hasSize(4);
     }
 
     @Test

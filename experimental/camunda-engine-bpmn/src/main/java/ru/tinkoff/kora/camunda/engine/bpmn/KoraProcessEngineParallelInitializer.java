@@ -8,7 +8,7 @@ import ru.tinkoff.kora.application.graph.Lifecycle;
 import ru.tinkoff.kora.camunda.engine.bpmn.configurator.ProcessEngineConfigurator;
 import ru.tinkoff.kora.common.util.TimeUtils;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -19,13 +19,13 @@ public final class KoraProcessEngineParallelInitializer implements Lifecycle {
     private final ProcessEngine processEngine;
     private final CamundaEngineBpmnConfig camundaEngineConfig;
     private final ProcessEngineConfiguration engineConfiguration;
-    private final List<ProcessEngineConfigurator> camundaConfigurators;
+    private final Collection<ProcessEngineConfigurator> camundaConfigurators;
     private final Executor executor;
 
     public KoraProcessEngineParallelInitializer(ProcessEngine processEngine,
                                                 CamundaEngineBpmnConfig camundaEngineConfig,
                                                 ProcessEngineConfiguration engineConfiguration,
-                                                List<ProcessEngineConfigurator> camundaConfigurators,
+                                                Collection<ProcessEngineConfigurator> camundaConfigurators,
                                                 Executor executor) {
         this.processEngine = processEngine;
         this.camundaEngineConfig = camundaEngineConfig;

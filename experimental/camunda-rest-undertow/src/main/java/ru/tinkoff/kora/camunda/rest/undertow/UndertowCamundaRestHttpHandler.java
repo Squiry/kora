@@ -39,7 +39,7 @@ final class UndertowCamundaRestHttpHandler implements Lifecycle, Wrapped<HttpHan
     private volatile DeploymentManager deploymentManager;
     private volatile HttpHandler realhttpHandler;
 
-    UndertowCamundaRestHttpHandler(List<Application> applications,
+    UndertowCamundaRestHttpHandler(Collection<Application> applications,
                                    CamundaRestConfig camundaRestConfig,
                                    CamundaRestTelemetry telemetry) {
         this.telemetry = telemetry;

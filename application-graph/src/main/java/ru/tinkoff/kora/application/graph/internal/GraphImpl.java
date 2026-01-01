@@ -61,16 +61,16 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
     private static <T> T getImpl(ApplicationGraphDraw draw, AtomicReferenceArray<@Nullable Object> objects, Node<T> node) {
         switch (node) {
             case CompositeConditionalNode<T> composite -> {
-                var candidates = new ArrayList<>(composite.candidates.size());
+                var candidates = new ArrayList<T>(composite.candidates.size());
                 for (var candidate : composite.candidates) {
-                    var object = objects.get(candidate.index);
+                    var object = objects.get(candidate.node().index);
                     if (object instanceof NodeCondition.ConditionResult.Failed) {
                         continue;
                     }
-                    candidates.add(object);
+                    candidates.add(candidate.applyMapper(Objects.requireNonNull(object)));
                 }
                 if (candidates.size() == 1) {
-                    return (T) candidates.getFirst();
+                    return candidates.getFirst();
                 }
                 if (candidates.isEmpty()) {
                     var message = new StringBuilder("All candidates for type ").append(node.type()).append(" ");
@@ -79,9 +79,9 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                     }
                     message.append("failed requirement to be present in graph:\n");
                     for (var candidate : composite.candidates) {
-                        var object = objects.get(candidate.index);
+                        var object = objects.get(candidate.node().index);
                         if (object instanceof NodeCondition.ConditionResult.Failed(var description)) {
-                            message.append("  - ").append(candidate.index).append(" ").append(candidate.type).append("\n");
+                            message.append("  - ").append(candidate.node().index).append(" ").append(candidate.node().type).append("\n");
                             for (var s : description) {
                                 message.append("    * ").append(s).append("\n");
                             }
@@ -95,12 +95,12 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                 }
                 message.append("\n");
                 for (var candidate : composite.candidates) {
-                    var object = objects.get(candidate.index);
+                    var object = objects.get(candidate.node().index);
                     if (object instanceof NodeCondition.ConditionResult.Failed(var description)) {
                         continue;
                     }
-                    assert candidate.condition != null;
-                    var condition = getImpl(draw, objects, candidate.condition);
+                    assert candidate.node().condition != null;
+                    var condition = getImpl(draw, objects, candidate.node().condition);
                     message.append("  - ").append(condition).append("\n");
                 }
                 throw new IllegalStateException(message.toString());
@@ -144,6 +144,14 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
             throw new IllegalArgumentException("Node is from another graph");
         }
         return new PromiseOfImpl<>(this, casted);
+    }
+
+    @Override
+    public boolean _shouldNodeBeCrated(Node<?> node) {
+        return switch (node) {
+            case CompositeConditionalNode<?> v -> true;
+            case NodeImpl<?> v -> v.condition == null || get(v.condition).eval() instanceof NodeCondition.ConditionResult.Matches;
+        };
     }
 
     @Override
@@ -267,15 +275,13 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
             var lock = locks.get(i);
             Thread.ofVirtual().name("release-" + i).start(() -> {
                 for (var dependencyNode : node.createDependencies) {
-                    switch (dependencyNode) {
+                    switch (dependencyNode.node()) {
                         case CompositeConditionalNode<?> v -> {
                             for (var candidate : v.candidates) {
-                                System.out.println("lock " + candidate.index + " thread " + Thread.currentThread().getName());
-                                locks.get(candidate.index).readLock().lock();
+                                locks.get(candidate.node().index).readLock().lock();
                             }
                         }
                         case NodeImpl<?> v -> {
-                            System.out.println("lock " + v.index + " thread " + Thread.currentThread().getName());
                             locks.get(v.index).readLock().lock();
                         }
                     }
@@ -284,12 +290,10 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                     switch (interceptorNode) {
                         case CompositeConditionalNode<?> v -> {
                             for (var candidate : v.candidates) {
-                                System.out.println("lock " + candidate.index + " thread " + Thread.currentThread().getName());
-                                locks.get(candidate.index).readLock().lock();
+                                locks.get(candidate.node().index).readLock().lock();
                             }
                         }
                         case NodeImpl<?> v -> {
-                            System.out.println("lock " + v.index + " thread " + Thread.currentThread().getName());
                             locks.get(v.index).readLock().lock();
                         }
                     }
@@ -311,15 +315,13 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                 } finally {
                     lock.writeLock().unlock();
                     for (var dependencyNode : node.createDependencies) {
-                        switch (dependencyNode) {
+                        switch (dependencyNode.node()) {
                             case CompositeConditionalNode<?> v -> {
                                 for (var candidate : v.candidates) {
-                                    System.out.println("unlock " + candidate.index + " thread " + Thread.currentThread().getName());
-                                    locks.get(candidate.index).readLock().unlock();
+                                    locks.get(candidate.node().index).readLock().unlock();
                                 }
                             }
                             case NodeImpl<?> v -> {
-                                System.out.println("unlock " + v.index + " thread " + Thread.currentThread().getName());
                                 locks.get(v.index).readLock().unlock();
                             }
                         }
@@ -328,12 +330,10 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                         switch (interceptorNode) {
                             case CompositeConditionalNode<?> v -> {
                                 for (var candidate : v.candidates) {
-                                    System.out.println("unlock " + candidate.index + " thread " + Thread.currentThread().getName());
-                                    locks.get(candidate.index).readLock().unlock();
+                                    locks.get(candidate.node().index).readLock().unlock();
                                 }
                             }
                             case NodeImpl<?> v -> {
-                                System.out.println("unlock " + v.index + " thread " + Thread.currentThread().getName());
                                 locks.get(v.index).readLock().unlock();
                             }
                         }
@@ -430,6 +430,14 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
         }
 
         @Override
+        public boolean _shouldNodeBeCrated(Node<?> node) {
+            return switch (node) {
+                case CompositeConditionalNode<?> v -> true;
+                case NodeImpl<?> v -> v.condition == null || get(v.condition).eval() instanceof NodeCondition.ConditionResult.Matches;
+            };
+        }
+
+        @Override
         @SuppressWarnings("unchecked")
         public <T> T get(Node<T> node) {
             return getImpl(this.rootGraph.draw, this.tmpArray, node);
@@ -437,11 +445,11 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
 
         @Override
         public <T> ValueOf<T> valueOf(Node<? extends T> node) {
-            var casted = (NodeImpl<? extends T>) node;
+//            var casted = (NodeImpl<? extends T>) node;
             // dirty hack to make copied graph work with valueOf
-            @SuppressWarnings("unchecked")
-            var fixed = (NodeImpl<? extends T>) this.rootGraph.draw.getNodes().get(casted.index);
-            var value = new TmpValueOf<T>(fixed, this, this.rootGraph);
+//            @SuppressWarnings("unchecked")
+//            var fixed = (NodeImpl<? extends T>) this.rootGraph.draw.getNodes().get(casted.index);
+            var value = new TmpValueOf<T>(node, this, this.rootGraph);
             this.newValueOf.add(value);
             return value;
         }
@@ -461,13 +469,26 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
             @SuppressWarnings("unchecked")
             var oldObject = (T) this.rootGraph.objects.get(node.index);
             var create = (Callable<@Nullable Void>) () -> {
-                var conditionFailed = new HashSet<String>();
+                if (node.condition != null) {
+                    var init = this.inits.get(((NodeImpl<?>) node.condition).index);
+                    if (init != null) {
+                        init.get();
+                    }
+                }
+                if (node.condition != null && this.get(node.condition).eval() instanceof NodeCondition.ConditionResult.Failed failed) {
+                    this.rootGraph.log.trace("Node {} is not created because dependency condition failed", node.index);
+                    if (Objects.equals(failed, oldObject)) {
+                        return null;
+                    }
+                    this.tmpArray.set(node.index, failed);
+                    return null;
+                }
                 for (var dependencyNode : node.createDependencies) {
-                    switch (dependencyNode) {
+                    switch (dependencyNode.node()) {
                         case CompositeConditionalNode<?> v -> {
                             for (var candidate : v.candidates) {
                                 try {
-                                    var init = this.inits.get(candidate.index);
+                                    var init = this.inits.get(candidate.node().index);
                                     if (init != null) {
                                         init.get();
                                     }
@@ -475,6 +496,7 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                                     throw new DependencyInitializationFailedException();
                                 }
                             }
+                            getImpl(this.rootGraph.draw, this.tmpArray, v);
                         }
                         case NodeImpl<?> v -> {
                             try {
@@ -486,8 +508,12 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                                 throw new DependencyInitializationFailedException();
                             }
                             var dependencyObject = this.tmpArray.get(v.index);
-                            if (dependencyObject instanceof NodeCondition.ConditionResult.Failed(var description)) {
-                                conditionFailed.addAll(description);
+                            if (dependencyObject instanceof NodeCondition.ConditionResult.Failed(var description) && !dependencyNode.isAllOf()) {
+                                var msg = new StringBuilder("Node ").append(node.index).append(" depends on node ").append(v.index).append(" but it was not created:\n");
+                                for (var s : description) {
+                                    msg.append("  - ").append(s).append("\n");
+                                }
+                                throw new IllegalStateException(msg.toString());
                             }
                         }
                     }
@@ -502,15 +528,13 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                             }
                             var dependencyObject = this.tmpArray.get(v.index);
                             if (dependencyObject instanceof NodeCondition.ConditionResult.Failed(var description)) {
-                                conditionFailed.addAll(description);
+                                var msg = new StringBuilder("Node ").append(node.index).append(" depends on node ").append(v.index).append(" but it was not created:\n");
+                                for (var s : description) {
+                                    msg.append("  - ").append(s).append("\n");
+                                }
+                                throw new IllegalStateException(msg.toString());
                             }
                         }
-                    }
-                }
-                if (node.condition != null) {
-                    var init = this.inits.get(((NodeImpl<?>) node.condition).index);
-                    if (init != null) {
-                        init.get();
                     }
                 }
                 if (oldObject != null && !node.createDependencies.isEmpty() && node.index != startFrom) {
@@ -535,24 +559,12 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                     }
                 }
                 if (this.rootGraph.log.isTraceEnabled()) {
-                    var dependenciesStr = node.createDependencies.stream().map(Node::toString).collect(Collectors.joining(",", "[", "]"));
+                    var dependenciesStr = node.createDependencies.stream().map(ApplicationGraphDraw.CreateDependency::node).map(Node::toString).collect(Collectors.joining(",", "[", "]"));
                     this.rootGraph.log.trace("Creating node {}, dependencies {}", node.index, dependenciesStr);
                 }
 
-                Object newObject;
-                if (!conditionFailed.isEmpty()) {
-                    newObject = NodeCondition.ConditionResult.failed(conditionFailed);
-                } else if (node.condition != null && this.get(node.condition).eval() instanceof NodeCondition.ConditionResult.Failed failed) {
-                    this.rootGraph.log.trace("Node {} is not created because dependency condition failed", node.index);
-                    newObject = failed;
-                } else {
-                    newObject = Objects.requireNonNull(node.factory.get(this));
-                }
+                var newObject = Objects.requireNonNull(node.factory.get(this));
                 if (Objects.equals(newObject, oldObject)) {
-                    return null;
-                }
-                if (newObject instanceof NodeCondition.ConditionResult.Failed) {
-                    this.tmpArray.set(node.index, newObject);
                     return null;
                 }
                 synchronized (TmpGraph.this) {
@@ -648,8 +660,8 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
                 this.createNode(startFrom, node);
             }
             var errors = new ArrayList<Throwable>();
-            for (var i = startFrom; i < GraphImpl.TmpGraph.this.inits.length(); i++) {
-                var init = GraphImpl.TmpGraph.this.inits.get(i);
+            for (var i = startFrom; i < TmpGraph.this.inits.length(); i++) {
+                var init = TmpGraph.this.inits.get(i);
                 try {
                     init.get();
                 } catch (InterruptedException e) {
@@ -669,9 +681,9 @@ public final class GraphImpl implements RefreshableGraph, Lifecycle {
     private static class TmpValueOf<T> implements ValueOf<T> {
         public volatile Graph tmpGraph;
         private final GraphImpl rootGraph;
-        private final NodeImpl<? extends T> node;
+        private final Node<? extends T> node;
 
-        private TmpValueOf(NodeImpl<? extends T> node, Graph tmpGraph, GraphImpl rootGraph) {
+        private TmpValueOf(Node<? extends T> node, Graph tmpGraph, GraphImpl rootGraph) {
             this.node = node;
             this.tmpGraph = tmpGraph;
             this.rootGraph = rootGraph;

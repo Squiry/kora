@@ -3,7 +3,7 @@ package ru.tinkoff.kora.resilient.retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -12,11 +12,11 @@ final class KoraRetryManager implements RetryManager {
     private static final Logger logger = LoggerFactory.getLogger(KoraRetryManager.class);
 
     private final Map<String, Retry> retryableByName = new ConcurrentHashMap<>();
-    private final List<RetryPredicate> failurePredicates;
+    private final Collection<RetryPredicate> failurePredicates;
     private final RetryConfig config;
     private final RetryMetrics metrics;
 
-    KoraRetryManager(RetryConfig config, List<RetryPredicate> failurePredicates, RetryMetrics metrics) {
+    KoraRetryManager(RetryConfig config, Collection<RetryPredicate> failurePredicates, RetryMetrics metrics) {
         this.config = config;
         this.failurePredicates = failurePredicates;
         this.metrics = metrics;

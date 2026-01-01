@@ -322,6 +322,11 @@ public abstract class AbstractAnnotationProcessorTest {
         }
 
         @Override
+        public boolean _shouldNodeBeCrated(Node<?> node) {
+            return graph._shouldNodeBeCrated(node);
+        }
+
+        @Override
         public void close() throws Exception {
             this.graph.release();
         }

@@ -8,15 +8,15 @@ import org.quartz.spi.JobFactory;
 import org.quartz.spi.TriggerFiredBundle;
 import ru.tinkoff.kora.application.graph.ValueOf;
 
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class KoraQuartzJobFactory implements JobFactory {
     private final Map<Class<? extends KoraQuartzJob>, ValueOf<KoraQuartzJob>> jobMap;
     private final JobFactory delegate = new PropertySettingJobFactory();
 
-    public KoraQuartzJobFactory(List<ValueOf<KoraQuartzJob>> jobs) {
+    public KoraQuartzJobFactory(Collection<ValueOf<KoraQuartzJob>> jobs) {
         this.jobMap = new HashMap<>();
         for (var job : jobs) {
             var realJob = job.get();

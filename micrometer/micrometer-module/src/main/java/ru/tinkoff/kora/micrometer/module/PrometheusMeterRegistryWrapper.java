@@ -16,17 +16,17 @@ import ru.tinkoff.kora.application.graph.Wrapped;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.util.Collection;
 
 public final class PrometheusMeterRegistryWrapper implements Lifecycle, Wrapped<PrometheusMeterRegistry> {
     private static final String KORA_VERSION = readVersion();
 
-    private final List<PrometheusMeterRegistryInitializer> initializers;
+    private final Collection<PrometheusMeterRegistryInitializer> initializers;
     private volatile PrometheusMeterRegistry registry;
     private volatile JvmGcMetrics gcMetrics;
     private volatile Gauge koraVersionMetric;
 
-    public PrometheusMeterRegistryWrapper(List<PrometheusMeterRegistryInitializer> initializers) {
+    public PrometheusMeterRegistryWrapper(Collection<PrometheusMeterRegistryInitializer> initializers) {
         this.initializers = initializers;
     }
 

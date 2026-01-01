@@ -104,6 +104,7 @@ public class GraphBuilder {
                     declaration, ComponentDependencyHelper.parseDependencyClaims(ctx, declaration)
                 ));
                 stack.addAll(findInterceptors(ctx, resolvedComponents, stack, declaration));
+                stack.addAll(findConditions(ctx, resolvedComponents, stack, declaration));
                 continue;
             }
 
@@ -131,11 +132,68 @@ public class GraphBuilder {
                     resolvedDependencies.add(new ComponentDependency.TypeOfDependency(dependencyClaim));
                     continue dependency;
                 }
-                var dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, resolvedComponents, dependencyClaim);
-                if (dependencyComponent != null) {
-                    // there's matching component in graph
-                    resolvedDependencies.add(dependencyComponent);
-                    continue dependency;
+//                var dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, resolvedComponents, dependencyClaim);
+//                if (dependencyComponent != null) {
+//                    // there's matching component in graph
+//                    resolvedDependencies.add(dependencyComponent);
+//                    continue dependency;
+//                }
+                // todo this might be slow as hell, maybe we should have some kind of Map<TypeMirror, List<ComponentDeclaration>> here so we could fast access declarations
+                // every component should exist in this map in keys represented by it type, every supertype and every implemented interface
+                //
+                var dependencyDeclarations = GraphResolutionHelper.findDependencyDeclarations(ctx, sourceDeclarations, dependencyClaim);
+                if (dependencyDeclarations.size() == 1) {
+                    var dependencyDeclaration = dependencyDeclarations.getFirst();
+                    var filtered = resolvedComponents.stream().filter(c -> c.declaration() == dependencyDeclaration).toList();
+                    var dependencies = GraphResolutionHelper.findDependencies(ctx, filtered, dependencyClaim);
+                    if (dependencies.isEmpty()) {
+                        // component not yet resolved - adding it to the tail, resolving
+                        this.addResolveComponentFrame(componentFrame.withCurrentDependency(currentDependency), dependencyDeclaration);
+                        continue frame;
+
+                    } else {
+                        resolvedDependencies.add(dependencies.getFirst());
+                        continue dependency;
+                    }
+                }
+                if (dependencyDeclarations.size() > 1) {
+                    if (dependencyDeclarations.stream().allMatch(c -> c.condition() != null)) {
+                        var set = new IdentityHashMap<ComponentDeclaration, ComponentDeclaration>();
+                        dependencyDeclarations.forEach(p -> set.put(p, p));
+                        var dependenciesToResolve = new ArrayList<ComponentDeclaration>();
+                        var alreadyResolved = new ArrayList<ComponentDependency.SingleDependency>();
+                        for (var dependencyDeclaration : dependencyDeclarations) {
+                            var filtered = resolvedComponents.stream().filter(c -> c.declaration() == dependencyDeclaration).toList();
+                            var dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, filtered, dependencyClaim);
+                            if (dependencyComponent != null) {
+                                alreadyResolved.add(dependencyComponent);
+                            } else {
+                                dependenciesToResolve.add(dependencyDeclaration);
+                            }
+                        }
+                        if (dependenciesToResolve.isEmpty()) {
+                            resolvedDependencies.add(new ComponentDependency.OneOfConditionalDependency(dependencyClaim, alreadyResolved));
+                            continue dependency;
+                        }
+                        // this might be slow but whatever
+                        this.addResolveComponentFrame(componentFrame.withCurrentDependency(currentDependency), dependenciesToResolve.getFirst());
+                        continue frame;
+                    } else {
+                        var set = new IdentityHashMap<ComponentDeclaration, ComponentDeclaration>();
+                        dependencyDeclarations.forEach(p -> set.put(p, p));
+                        var filtered = resolvedComponents.stream().filter(c -> set.containsKey(c.declaration())).toList();
+
+                        var dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, filtered, dependencyClaim);
+                        if (dependencyComponent != null) {
+                            resolvedDependencies.add(dependencyComponent);
+                            continue dependency;
+                        } else {
+                            // component not yet resolved - adding it to the tail, resolving
+                            var dependencyDeclaration = Objects.requireNonNull(GraphResolutionHelper.findDependencyDeclaration(ctx, declaration, dependencyDeclarations, dependencyClaim));
+                            this.addResolveComponentFrame(componentFrame.withCurrentDependency(currentDependency), dependencyDeclaration);
+                            continue frame;
+                        }
+                    }
                 }
                 var dependencyDeclaration = GraphResolutionHelper.findDependencyDeclaration(ctx, declaration, sourceDeclarations, dependencyClaim);
                 if (dependencyDeclaration != null) {
@@ -187,12 +245,6 @@ public class GraphBuilder {
                     stack.addLast(new ResolutionFrame.Component(
                         optionalDeclaration, List.of(ComponentDependencyHelper.parseClaim(componentFrame.declaration().source(), ((DeclaredType) dependencyClaim.type()).getTypeArguments().get(0), dependencyClaim.tag(), true))
                     ));
-                    continue frame;
-                }
-                var finalClassComponent = GraphResolutionHelper.findFinalDependency(ctx, dependencyClaim);
-                if (finalClassComponent != null) {
-                    sourceDeclarations.add(finalClassComponent);
-                    this.addResolveComponentFrame(componentFrame.withCurrentDependency(currentDependency), finalClassComponent);
                     continue frame;
                 }
                 var extension = ctx.extensions.findExtension(roundEnv, dependencyClaim.type(), dependencyClaim.tag());
@@ -250,6 +302,7 @@ public class GraphBuilder {
             declaration, ComponentDependencyHelper.parseDependencyClaims(ctx, declaration)
         ));
         stack.addAll(findInterceptors(ctx, resolvedComponents, stack, declaration));
+        stack.addAll(findConditions(ctx, resolvedComponents, stack, declaration));
     }
 
     @Nullable
@@ -292,6 +345,26 @@ public class GraphBuilder {
     private List<ResolutionFrame.Component> findInterceptors(ProcessingContext ctx, List<ResolvedComponent> resolvedComponents, Deque<ResolutionFrame> resolutionStack, ComponentDeclaration declaration) {
         return GraphResolutionHelper.findInterceptorDeclarations(ctx, sourceDeclarations, declaration.type())
             .stream()
+            .filter(id -> resolvedComponents.stream().noneMatch(rc -> rc.declaration() == id) && resolutionStack.stream().noneMatch(rf -> rf instanceof ResolutionFrame.Component c && c.declaration() == id))
+            .map(id -> new ResolutionFrame.Component(id, ComponentDependencyHelper.parseDependencyClaims(ctx, id)))
+            .toList();
+    }
+
+    private List<ResolutionFrame.Component> findConditions(ProcessingContext ctx, List<ResolvedComponent> resolvedComponents, Deque<ResolutionFrame> resolutionStack, ComponentDeclaration declaration) {
+        var condition = declaration.condition();
+        if (condition == null) {
+            return List.of();
+        }
+        var declarations = sourceDeclarations.stream()
+            .filter(d -> condition.toString().equals(d.tag()) && ctx.serviceTypeHelper.isCondition(d.type()))
+            .toList();
+        if (declarations.isEmpty()) {
+            throw new ProcessingErrorException("Conditional component requires condition with tag %s to be presented in graph but none was found".formatted(condition.toString()), declaration.source());
+        }
+        if (declarations.size() > 1) {
+            throw new ProcessingErrorException("Conditional component requires exactly one condition with matching tag %s to be presented in graph".formatted(condition.toString()), declaration.source());
+        }
+        return declarations.stream()
             .filter(id -> resolvedComponents.stream().noneMatch(rc -> rc.declaration() == id) && resolutionStack.stream().noneMatch(rf -> rf instanceof ResolutionFrame.Component c && c.declaration() == id))
             .map(id -> new ResolutionFrame.Component(id, ComponentDependencyHelper.parseDependencyClaims(ctx, id)))
             .toList();

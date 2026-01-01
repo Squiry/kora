@@ -3,7 +3,7 @@ package ru.tinkoff.kora.resilient.circuitbreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -13,10 +13,10 @@ final class KoraCircuitBreakerManager implements CircuitBreakerManager {
 
     private final Map<String, CircuitBreaker> circuitBreakerMap = new ConcurrentHashMap<>();
     private final CircuitBreakerConfig config;
-    private final List<CircuitBreakerPredicate> failurePredicates;
+    private final Collection<CircuitBreakerPredicate> failurePredicates;
     private final CircuitBreakerMetrics metrics;
 
-    KoraCircuitBreakerManager(CircuitBreakerConfig config, List<CircuitBreakerPredicate> failurePredicates, CircuitBreakerMetrics metrics) {
+    KoraCircuitBreakerManager(CircuitBreakerConfig config, Collection<CircuitBreakerPredicate> failurePredicates, CircuitBreakerMetrics metrics) {
         this.config = config;
         this.failurePredicates = failurePredicates;
         this.metrics = metrics;

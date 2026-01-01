@@ -1,6 +1,6 @@
 package ru.tinkoff.kora.http.server.common;
 
-import ru.tinkoff.kora.application.graph.All;
+import org.jspecify.annotations.Nullable;
 import ru.tinkoff.kora.application.graph.PromiseOf;
 import ru.tinkoff.kora.application.graph.ValueOf;
 import ru.tinkoff.kora.common.liveness.LivenessProbe;
@@ -12,6 +12,7 @@ import ru.tinkoff.kora.http.server.common.telemetry.PrivateApiMetrics;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.*;
@@ -23,13 +24,13 @@ public class PrivateApiHandler {
 
     private final ValueOf<HttpServerConfig> config;
     private final ValueOf<Optional<PrivateApiMetrics>> meterRegistry;
-    private final All<PromiseOf<ReadinessProbe>> readinessProbes;
-    private final All<PromiseOf<LivenessProbe>> livenessProbes;
+    private final Collection<PromiseOf<ReadinessProbe>> readinessProbes;
+    private final Collection<PromiseOf<LivenessProbe>> livenessProbes;
 
     public PrivateApiHandler(ValueOf<HttpServerConfig> config,
                              ValueOf<Optional<PrivateApiMetrics>> meterRegistry,
-                             All<PromiseOf<ReadinessProbe>> readinessProbes,
-                             All<PromiseOf<LivenessProbe>> livenessProbes) {
+                             Collection<PromiseOf<ReadinessProbe>> readinessProbes,
+                             Collection<PromiseOf<LivenessProbe>> livenessProbes) {
         this.config = config;
         this.meterRegistry = meterRegistry;
         this.readinessProbes = readinessProbes;
@@ -86,17 +87,22 @@ public class PrivateApiHandler {
     }
 
     public interface TFunction<T, R> {
+        @Nullable
         R apply(T t) throws Exception;
     }
 
-    private <Probe, Failure> HttpServerResponse handleProbes(All<PromiseOf<Probe>> probes, TFunction<Probe, Failure> performProbe, Function<Failure, String> getMessage) {
+    private <Probe, Failure> HttpServerResponse handleProbes(Collection<PromiseOf<Probe>> probes, TFunction<Probe, Failure> performProbe, Function<Failure, String> getMessage) {
         if (probes.isEmpty()) {
             return HttpServerResponse.of(200, HttpBody.plaintext("OK"));
         }
         var futures = new CompletableFuture<?>[probes.size()];
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var it = probes.iterator();
             for (int i = 0; i < futures.length; i++) {
-                var optional = probes.get(i).get();
+                if (!it.hasNext()) {
+                    throw new IllegalStateException();
+                }
+                var optional = it.next().get();
                 if (optional.isEmpty()) {
                     return HttpServerResponse.of(503, HttpBody.plaintext("Probe is not ready yet"));
                 }
@@ -109,7 +115,7 @@ public class PrivateApiHandler {
                             throw new CompletionException(e);
                         }
                     }, executor);
-                    var future = new CompletableFuture<String>();
+                    var future = new CompletableFuture<@Nullable String>();
                     probeResult.whenComplete((result, error) -> {
                         if (error != null) {
                             future.complete("Probe failed: " + error.getMessage());

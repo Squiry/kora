@@ -16,12 +16,14 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.*;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -231,9 +233,17 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
             }
 
             currentClass.addField(FieldSpec.builder(ParameterizedTypeName.get(CommonClassNames.node, componentTypeName), component.fieldName(), Modifier.PRIVATE, Modifier.FINAL).build());
+            currentConstructor.addCode("{");
             currentConstructor.addStatement("var _type_of_$L = map.get($S)", component.fieldName(), component.fieldName());
+            for (int j = 0; j < component.dependencies().size(); j++) {
+                var dependency = component.dependencies().get(j);
+                if (dependency instanceof ComponentDependency.OneOfConditionalDependency oneOf) {
+                    currentConstructor.addStatement("var d$L = $L", j, this.oneOfNode(graphTypeName, component, oneOf));
+                }
+            }
+
             var statement = this.generateComponentStatement(graphTypeName, allModules, interceptors, components, component);
-            currentConstructor.addStatement(statement);
+            currentConstructor.addCode(statement).addCode(";}\n");
         }
         if (components.size() > 0) {
             var lastComponentNumber = components.size() / COMPONENTS_PER_HOLDER_CLASS;
@@ -272,94 +282,131 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
             .build();
     }
 
+    private CodeBlock oneOfNode(TypeName graphTypeName, ResolvedComponent component, ComponentDependency.OneOfConditionalDependency oneOf) {
+        var parts = new ArrayList<CodeBlock>(oneOf.candidates().size());
+        for (var candidate : oneOf.candidates()) {
+            var mapper = types.isAssignable(oneOf.claim().type(), candidate.component().type())
+                ? CodeBlock.of("$T.identity()", Function.class)
+                : CodeBlock.of("$T::value", CommonClassNames.wrapped);
+            if (component.holderName().equals(candidate.component().holderName())) {
+                parts.add(CodeBlock.of("new $T<>($N, $L)", CommonClassNames.node.nestedClass("NodeWithMapper"), candidate.component().fieldName(), mapper));
+            } else {
+                parts.add(CodeBlock.of("new $T<>($T.$N.$N, $L)", CommonClassNames.node.nestedClass("NodeWithMapper"), graphTypeName, candidate.component().holderName(), candidate.component().fieldName(), mapper));
+            }
+        }
+        var type = CodeBlock.builder();
+        if (oneOf.claim().type() instanceof DeclaredType dt) {
+            if (dt.getTypeArguments().isEmpty()) {
+                type.add("$T.class", oneOf.claim().type());
+            } else {
+                type.add("$L", ComponentDependency.TypeOfDependency.buildTypeRef(types, oneOf.claim().type()));
+            }
+        } else if (oneOf.claim().type() instanceof ArrayType at) {
+            type.add("$T.class", at.toString());
+        } else {
+            throw new IllegalArgumentException("Unknown component type kind: " + oneOf.claim().type());
+        }
+        var tag = oneOf.claim().tag() == null
+            ? CodeBlock.of("null")
+            : CodeBlock.of("$S", oneOf.claim().tag());
+        return CodeBlock.of("$T.oneOf($L, $L, $T.of($>\n$L$<\n))", CommonClassNames.node, type.build(), tag, List.class, CodeBlock.join(parts, ",\n"));
+    }
+
     private CodeBlock generateComponentStatement(ClassName graphTypeName, List<TypeElement> allModules, ComponentInterceptors interceptors, List<ResolvedComponent> components, ResolvedComponent component) {
         var statement = CodeBlock.builder();
         var declaration = component.declaration();
-        statement.add("$L = graphDraw.addNode0(_type_of_$L, ", component.fieldName(), component.fieldName());
+        statement.add("$N = graphDraw.addNode(_type_of_$L, ", component.fieldName(), component.fieldName());
         if (component.tag() == null) {
             statement.add("null, ");
         } else {
             statement.add("$L.class, ", component.tag());
         }
+        if (component.declaration().condition() != null) {
+            var conditionStr = component.declaration().condition().toString();
+            var conditionComponent = components.stream()
+                .filter(c -> conditionStr.equals(c.declaration().tag()))
+                .filter(c -> ctx.serviceTypeHelper.isCondition(c.type()))
+                .findFirst()
+                .get();
+            if (conditionComponent.holderName().equals(component.holderName())) {
+                statement.add("$N, ", conditionComponent.fieldName());
+            } else {
+                statement.add("$N.$N, ", conditionComponent.holderName(), conditionComponent.fieldName());
+            }
+        } else {
+            statement.add("null, ");
+        }
+        statement.add("$L, ", createDependencies(components, component));
+        statement.add("$L, ", refreshDependencies(components, component));
+        statement.add("$L, ", interceptors(interceptors, component));
         statement.add("g -> ");
         var dependenciesCode = this.generateDependenciesCode(component, graphTypeName, components);
-
-        if (declaration instanceof ComponentDeclaration.AnnotatedComponent annotatedComponent) {
-            statement.add("new $T", ClassName.get(annotatedComponent.typeElement()));
-            if (!annotatedComponent.typeVariables().isEmpty()) {
-                statement.add("<");
-                for (int i = 0; i < annotatedComponent.typeVariables().size(); i++) {
-                    if (i > 0) statement.add(", ");
-                    statement.add("$T", annotatedComponent.typeVariables().get(i));
+        switch (declaration) {
+            case ComponentDeclaration.AnnotatedComponent annotatedComponent -> {
+                statement.add("new $T", ClassName.get(annotatedComponent.typeElement()));
+                if (!annotatedComponent.typeVariables().isEmpty()) {
+                    statement.add("<");
+                    for (int i = 0; i < annotatedComponent.typeVariables().size(); i++) {
+                        if (i > 0) statement.add(", ");
+                        statement.add("$T", annotatedComponent.typeVariables().get(i));
+                    }
+                    statement.add(">");
                 }
-                statement.add(">");
+                statement.add("($L)", dependenciesCode);
             }
-            statement.add("($L)", dependenciesCode);
-        } else if (declaration instanceof ComponentDeclaration.FromModuleComponent moduleComponent) {
-            if (moduleComponent.module() instanceof ModuleDeclaration.AnnotatedModule annotatedModule) {
-                statement.add("impl.module$L.", allModules.indexOf(annotatedModule.element()));
-            } else {
-                statement.add("impl.");
-            }
-            if (!moduleComponent.typeVariables().isEmpty()) {
-                statement.add("<");
-                for (int i = 0; i < moduleComponent.typeVariables().size(); i++) {
-                    if (i > 0) statement.add(", ");
-                    statement.add("$T", moduleComponent.typeVariables().get(i));
+            case ComponentDeclaration.FromModuleComponent moduleComponent -> {
+                if (moduleComponent.module() instanceof ModuleDeclaration.AnnotatedModule annotatedModule) {
+                    statement.add("impl.module$L.", allModules.indexOf(annotatedModule.element()));
+                } else {
+                    statement.add("impl.");
                 }
-                statement.add(">");
+                if (!moduleComponent.typeVariables().isEmpty()) {
+                    statement.add("<");
+                    for (int i = 0; i < moduleComponent.typeVariables().size(); i++) {
+                        if (i > 0) statement.add(", ");
+                        statement.add("$T", moduleComponent.typeVariables().get(i));
+                    }
+                    statement.add(">");
+                }
+                statement.add("$L($L)", moduleComponent.method().getSimpleName(), dependenciesCode);
             }
-            statement.add("$L($L)", moduleComponent.method().getSimpleName(), dependenciesCode);
-        } else if (declaration instanceof ComponentDeclaration.FromExtensionComponent extension) {
-            statement.add(extension.generator().apply(dependenciesCode));
-        } else if (declaration instanceof ComponentDeclaration.DiscoveredAsDependencyComponent asDependencyComponent) {
-            if (asDependencyComponent.typeElement().getTypeParameters().isEmpty()) {
-                statement.add("new $T($L)", ClassName.get(asDependencyComponent.typeElement()), dependenciesCode);
-            } else {
-                statement.add("new $T<>($L)", ClassName.get(asDependencyComponent.typeElement()), dependenciesCode);
+            case ComponentDeclaration.FromExtensionComponent extension -> statement.add(extension.generator().apply(dependenciesCode));
+            case ComponentDeclaration.PromisedProxyComponent promisedProxyComponent -> {
+                if (promisedProxyComponent.typeElement().getTypeParameters().isEmpty()) {
+                    statement.add("new $T($L)", promisedProxyComponent.className(), dependenciesCode);
+                } else {
+                    statement.add("new $T<>($L)", promisedProxyComponent.className(), dependenciesCode);
+                }
             }
-        } else if (declaration instanceof ComponentDeclaration.PromisedProxyComponent promisedProxyComponent) {
-            if (promisedProxyComponent.typeElement().getTypeParameters().isEmpty()) {
-                statement.add("new $T($L)", promisedProxyComponent.className(), dependenciesCode);
-            } else {
-                statement.add("new $T<>($L)", promisedProxyComponent.className(), dependenciesCode);
+            case ComponentDeclaration.OptionalComponent optional -> {
+                var optionalOf = ((DeclaredType) optional.type()).getTypeArguments().get(0);
+                statement.add("$T.<$T>ofNullable($L)", Optional.class, optionalOf, dependenciesCode);
             }
-        } else if (declaration instanceof ComponentDeclaration.OptionalComponent optional) {
-            var optionalOf = ((DeclaredType) optional.type()).getTypeArguments().get(0);
-            statement.add("$T.<$T>ofNullable($L)", Optional.class, optionalOf, dependenciesCode);
-        } else {
-            throw new RuntimeException("Unknown type " + declaration);
-        }
-        var resolvedDependencies = component.dependencies();
-        statement.add(", $T.of(", List.class);
-        var interceptorsFor = interceptors.interceptorsFor(component);
-        for (int i = 0; i < interceptorsFor.size(); i++) {
-            var interceptor = interceptorsFor.get(i);
-            if (component.holderName().equals(interceptor.component().holderName())) {
-                statement.add("$N", interceptor.component().fieldName());
-            } else {
-                statement.add("$N.$N", interceptor.component().holderName(), interceptor.component().fieldName());
-            }
-            if (i < interceptorsFor.size() - 1) {
-                statement.add(", ");
-            }
+            default -> throw new RuntimeException("Unknown type " + declaration);
         }
         statement.add(")");
-        for (var resolvedDependency : resolvedDependencies) {
-            if (resolvedDependency instanceof ComponentDependency.AllOfDependency allOf) {
-                if (allOf.claim().claimType() != DependencyClaim.DependencyClaimType.ALL_OF_PROMISE) {
-                    var dependencies = GraphResolutionHelper.findDependenciesForAllOf(ctx, allOf.claim(), components);
+        return statement.build();
+    }
+
+    private CodeBlock createDependencies(List<ResolvedComponent> components, ResolvedComponent component) {
+        var parts = new ArrayList<CodeBlock>();
+        for (int i = 0; i < component.dependencies().size(); i++) {
+            var resolvedDependency = component.dependencies().get(i);
+            if (resolvedDependency instanceof ComponentDependency.AllOfDependency(var claim)) {
+                if (claim.claimType() != DependencyClaim.DependencyClaimType.ALL_OF_PROMISE) {
+                    var dependencies = GraphResolutionHelper.findDependenciesForAllOf(ctx, claim, components);
                     for (var dependency : dependencies) {
                         if (component.holderName().equals(dependency.component().holderName())) {
-                            statement.add(", $N", dependency.component().fieldName());
+                            parts.add(CodeBlock.of("new $T($N, true)", CommonClassNames.applicationGraphDraw.nestedClass("CreateDependency"), dependency.component().fieldName()));
                         } else {
-                            statement.add(", $N.$N", dependency.component().holderName(), dependency.component().fieldName());
-                        }
-                        if (allOf.claim().claimType() == DependencyClaim.DependencyClaimType.ALL_OF_VALUE) {
-                            statement.add(".valueOf()");
+                            parts.add(CodeBlock.of("new $T($N.$N, true)", CommonClassNames.applicationGraphDraw.nestedClass("CreateDependency"), dependency.component().holderName(), dependency.component().fieldName()));
                         }
                     }
                 }
+                continue;
+            }
+            if (resolvedDependency instanceof ComponentDependency.OneOfConditionalDependency) {
+                parts.add(CodeBlock.of("new $T(d$L, false)", CommonClassNames.applicationGraphDraw.nestedClass("CreateDependency"), i));
                 continue;
             }
             if (resolvedDependency instanceof ComponentDependency.PromiseOfDependency || resolvedDependency instanceof ComponentDependency.PromisedProxyParameterDependency) {
@@ -368,17 +415,58 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
 
             if (resolvedDependency instanceof ComponentDependency.SingleDependency dependency && dependency.component() != null) {
                 if (component.holderName().equals(dependency.component().holderName())) {
-                    statement.add(", $N", dependency.component().fieldName());
+                    parts.add(CodeBlock.of("new $T($N, false)", CommonClassNames.applicationGraphDraw.nestedClass("CreateDependency"), dependency.component().fieldName()));
                 } else {
-                    statement.add(", $N.$N", dependency.component().holderName(), dependency.component().fieldName());
-                }
-                if (resolvedDependency instanceof ComponentDependency.ValueOfDependency) {
-                    statement.add(".valueOf()");
+                    parts.add(CodeBlock.of("new $T($N.$N, false)", CommonClassNames.applicationGraphDraw.nestedClass("CreateDependency"), dependency.component().holderName(), dependency.component().fieldName()));
                 }
             }
         }
-        statement.add(")");
-        return statement.build();
+        return CodeBlock.of("$T.of($L)", List.class, CodeBlock.join(parts, ", "));
+    }
+
+    private CodeBlock refreshDependencies(List<ResolvedComponent> components, ResolvedComponent component) {
+        var parts = new ArrayList<CodeBlock>();
+        for (var resolvedDependency : component.dependencies()) {
+            if (resolvedDependency instanceof ComponentDependency.AllOfDependency(var claim)) {
+                if (claim.claimType() == DependencyClaim.DependencyClaimType.ALL_OF_ONE) {
+                    var dependencies = GraphResolutionHelper.findDependenciesForAllOf(ctx, claim, components);
+                    for (var dependency : dependencies) {
+                        if (component.holderName().equals(dependency.component().holderName())) {
+                            parts.add(CodeBlock.of("$N", dependency.component().fieldName()));
+                        } else {
+                            parts.add(CodeBlock.of("$N.$N", dependency.component().holderName(), dependency.component().fieldName()));
+                        }
+                    }
+                }
+                continue;
+            }
+            if (resolvedDependency instanceof ComponentDependency.PromiseOfDependency || resolvedDependency instanceof ComponentDependency.ValueOfDependency || resolvedDependency instanceof ComponentDependency.PromisedProxyParameterDependency) {
+                continue;
+            }
+
+            if (resolvedDependency instanceof ComponentDependency.SingleDependency dependency && dependency.component() != null) {
+                if (component.holderName().equals(dependency.component().holderName())) {
+                    parts.add(CodeBlock.of("$N", dependency.component().fieldName()));
+                } else {
+                    parts.add(CodeBlock.of("$N.$N", dependency.component().holderName(), dependency.component().fieldName()));
+                }
+            }
+        }
+        return CodeBlock.of("$T.of($L)", List.class, CodeBlock.join(parts, ", "));
+    }
+
+    private CodeBlock interceptors(ComponentInterceptors interceptors, ResolvedComponent component) {
+        var parts = new ArrayList<CodeBlock>();
+        var interceptorsFor = interceptors.interceptorsFor(component);
+        for (int i = 0; i < interceptorsFor.size(); i++) {
+            var interceptor = interceptorsFor.get(i);
+            if (component.holderName().equals(interceptor.component().holderName())) {
+                parts.add(CodeBlock.of("$N", interceptor.component().fieldName()));
+            } else {
+                parts.add(CodeBlock.of("$N.$N", interceptor.component().holderName(), interceptor.component().fieldName()));
+            }
+        }
+        return CodeBlock.of("$T.of($L)", List.class, CodeBlock.join(parts, ", "));
     }
 
     private CodeBlock generateDependenciesCode(ResolvedComponent component, ClassName graphTypeName, List<ResolvedComponent> components) {
@@ -392,7 +480,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
         for (int i = 0, dependenciesSize = resolvedDependencies.size(); i < dependenciesSize; i++) {
             if (i > 0) b.add(",\n");
             var resolvedDependency = resolvedDependencies.get(i);
-            b.add(resolvedDependency.write(this.ctx, graphTypeName, components));
+            b.add(resolvedDependency.write(this.ctx, graphTypeName, components, i));
         }
         b.unindent();
         b.add("\n");

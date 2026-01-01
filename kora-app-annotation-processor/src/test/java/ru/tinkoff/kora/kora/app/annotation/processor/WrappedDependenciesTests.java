@@ -18,13 +18,13 @@ public class WrappedDependenciesTests extends AbstractKoraAppTest {
                 }
 
                 @Root
-                default Class3 class3(ValueOf<Class1> class1) {
-                    return new Class3();
+                default Class2 class3(ValueOf<Class1> class1) {
+                    return new Class2();
                 }
 
                 @Root
-                default Class4 class4(All<ValueOf<Class1>> class1) {
-                    return new Class4();
+                default Class2 class4(All<ValueOf<Class1>> class1) {
+                    return new Class2();
                 }
 
                 @Root
@@ -33,13 +33,13 @@ public class WrappedDependenciesTests extends AbstractKoraAppTest {
                 }
 
                 @Root
-                default Class3 class3Wrapped(ValueOf<Wrapped<Class1>> class1) {
-                    return new Class3();
+                default Class2 class3Wrapped(ValueOf<Wrapped<Class1>> class1) {
+                    return new Class2();
                 }
 
                 @Root
-                default Class4 class4Wrapped(All<ValueOf<Wrapped<Class1>>> class1) {
-                    return new Class4();
+                default Class2 class4Wrapped(All<ValueOf<Wrapped<Class1>>> class1) {
+                    return new Class2();
                 }
 
 
@@ -51,10 +51,6 @@ public class WrappedDependenciesTests extends AbstractKoraAppTest {
                 class Class1 {}
 
                 class Class2 {}
-
-                class Class3 {}
-
-                class Class4 {}
             }
             """);
 
@@ -226,4 +222,79 @@ public class WrappedDependenciesTests extends AbstractKoraAppTest {
         var materializedGraph = draw.init();
         assertThat(materializedGraph).isNotNull();
     }
+
+    @Test
+    public void testWrappedConditionalComponentWorksWithExactlyOneMatch() throws Exception {
+        var draw = compile("""
+            @KoraApp
+            public interface ExampleApplication {
+
+                @Root
+                default Class2 class2(Class1 class1) {
+                    return new Class2();
+                }
+
+                @Root
+                default Class2 class3(ValueOf<Class1> class1) {
+                    return new Class2();
+                }
+
+                @Root
+                default Class2 class4(All<ValueOf<Class1>> class1) {
+                    return new Class2();
+                }
+
+                @Root
+                default Class2 class2ValueWrapped(Wrapped<Class1> class1) {
+                    return new Class2();
+                }
+
+                @Root
+                default Class2 class3Wrapped(ValueOf<Wrapped<Class1>> class1) {
+                    return new Class2();
+                }
+
+                @Root
+                default Class2 class4Wrapped(All<ValueOf<Wrapped<Class1>>> class1) {
+                    return new Class2();
+                }
+            
+                class Class1 {}
+                class Class2 {}
+
+                @Conditional(Matched.class)
+                default Wrapped<Class1> conditional1() {
+                    var c1 = new Class1();
+                    return () -> c1;
+                }
+
+                @Conditional(NonMatched.class)
+                default Wrapped<Class1> conditional2() {
+                    var c1 = new Class1();
+                    return () -> c1;
+                }
+            
+                @Component
+                @Tag(Matched.class)
+                class Matched implements NodeCondition {
+                    @Override
+                    public ConditionResult eval() {
+                        return ConditionResult.matches();
+                    }
+                }
+            
+                @Component
+                @Tag(NonMatched.class)
+                class NonMatched implements NodeCondition {
+                    @Override
+                    public ConditionResult eval() {
+                        return ConditionResult.failed("test");
+                    }
+                }
+            }
+            """);
+
+        draw.init().release();
+    }
+
 }

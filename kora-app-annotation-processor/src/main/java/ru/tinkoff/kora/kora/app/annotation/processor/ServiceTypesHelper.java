@@ -18,6 +18,8 @@ public class ServiceTypesHelper {
     private final DeclaredType wrappedType;
     private final TypeElement interceptorTypeElement;
     private final DeclaredType interceptorType;
+    private final TypeElement nodeConditionTypeElement;
+    private final DeclaredType nodeConditionType;
 
     public ServiceTypesHelper(Elements elements, Types types) {
         this.elements = elements;
@@ -26,6 +28,8 @@ public class ServiceTypesHelper {
         this.wrappedType = Objects.requireNonNull(this.types.getDeclaredType(this.wrappedTypeElement, this.types.getWildcardType(null, null)));
         this.interceptorTypeElement = Objects.requireNonNull(this.elements.getTypeElement(CommonClassNames.graphInterceptor.canonicalName()));
         this.interceptorType = Objects.requireNonNull(this.types.getDeclaredType(this.interceptorTypeElement, this.types.getWildcardType(null, null)));
+        this.nodeConditionTypeElement = Objects.requireNonNull(this.elements.getTypeElement(CommonClassNames.nodeCondition.canonicalName()));
+        this.nodeConditionType = Objects.requireNonNull(this.types.getDeclaredType(this.nodeConditionTypeElement));
     }
 
     public DeclaredType tryUnwrap(DeclaredType maybeWrapped) {
@@ -92,5 +96,9 @@ public class ServiceTypesHelper {
         var interceptorTypeParameter = this.interceptorTypeElement.getTypeParameters().get(0); // somehow it can be changed during execution
         var declaredType = (DeclaredType) maybeInterceptor;
         return this.types.asMemberOf(declaredType, interceptorTypeParameter);
+    }
+
+    public boolean isCondition(TypeMirror type) {
+        return this.types.isAssignable(type, this.nodeConditionType);
     }
 }

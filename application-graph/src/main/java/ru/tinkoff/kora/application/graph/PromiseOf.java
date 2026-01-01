@@ -7,7 +7,7 @@ public interface PromiseOf<T> {
 
     Optional<T> get();
 
-    default <Q> PromiseOf<Q> map(Function<T, Q> mapper) {
+    default <Q> PromiseOf<Q> map(Function<T, ? extends Q> mapper) {
         return () -> {
             var value = PromiseOf.this.get();
             return value.map(mapper);

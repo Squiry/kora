@@ -13,7 +13,6 @@ import org.mockito.AdditionalAnswers;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.mockito.verification.VerificationMode;
-import ru.tinkoff.kora.application.graph.All;
 import ru.tinkoff.kora.application.graph.PromiseOf;
 import ru.tinkoff.kora.application.graph.ValueOf;
 import ru.tinkoff.kora.common.liveness.LivenessProbe;
@@ -59,7 +58,7 @@ public abstract class HttpServerTestKit {
 
     private static final ValueOf<HttpServerConfig> config = valueOf($HttpServerConfig_ConfigValueExtractor.DEFAULTS);
 
-    private final PrivateApiHandler privateApiHandler = new PrivateApiHandler(config, valueOf(Optional.of(registry)), All.of(readinessProbePromise), All.of(livenessProbePromise));
+    private final PrivateApiHandler privateApiHandler = new PrivateApiHandler(config, valueOf(Optional.of(registry)), List.of(readinessProbePromise), List.of(livenessProbePromise));
 
     private volatile HttpServer httpServer = null;
     private volatile PrivateHttpServer privateHttpServer = null;

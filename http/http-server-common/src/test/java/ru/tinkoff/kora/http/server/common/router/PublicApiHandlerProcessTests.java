@@ -5,7 +5,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
-import ru.tinkoff.kora.application.graph.All;
 import ru.tinkoff.kora.http.common.body.HttpBody;
 import ru.tinkoff.kora.http.common.body.HttpBodyInput;
 import ru.tinkoff.kora.http.common.header.HttpHeaders;
@@ -68,7 +67,7 @@ class PublicApiHandlerProcessTests {
         var telemetryFactory = Mockito.mock(HttpServerTelemetryFactory.class);
         when(telemetryFactory.get(any())).thenReturn(telemetry);
         var config = config(false);
-        var handler = new PublicApiHandler(handlers, All.of(), config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
 
         // when
         var request = new PublicApiRequestImpl(method, path, "foo", "http", HttpHeaders.of(), Map.of(), HttpBody.empty());
@@ -116,7 +115,7 @@ class PublicApiHandlerProcessTests {
         var telemetryFactory = Mockito.mock(HttpServerTelemetryFactory.class);
         when(telemetryFactory.get(any())).thenReturn(telemetry);
         var config = config(true);
-        var handler = new PublicApiHandler(handlers, All.of(), config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
 
         // when
         var request = new PublicApiRequestImpl(method, path, "foo", "http", HttpHeaders.of(), Map.of(), HttpBody.empty());
@@ -129,14 +128,14 @@ class PublicApiHandlerProcessTests {
 
     @Test
     void testWildcard() throws Exception {
-        var handlers = All.of(
+        var handlers = List.of(
             handler("GET", "/baz"),
             handler("POST", "/*")
         );
         var config = config(false);
         var telemetryFactory = Mockito.mock(HttpServerTelemetryFactory.class);
         when(telemetryFactory.get(any())).thenReturn(NoopHttpServerTelemetry.INSTANCE);
-        var handler = new PublicApiHandler(handlers, All.of(), config);
+        var handler = new PublicApiHandler(handlers, List.of(), config);
 
         var request = new PublicApiRequestImpl("POST", "/baz", "test", "http", HttpHeaders.of(), Map.of(), HttpBody.empty());
         var routedRq = handler.route(request);

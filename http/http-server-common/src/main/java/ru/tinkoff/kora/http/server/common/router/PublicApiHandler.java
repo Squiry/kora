@@ -6,10 +6,7 @@ import ru.tinkoff.kora.http.common.header.HttpHeaders;
 import ru.tinkoff.kora.http.server.common.*;
 import ru.tinkoff.kora.http.server.common.handler.HttpServerRequestHandler;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -30,7 +27,7 @@ public class PublicApiHandler {
     private final PathTemplateMatcher<List<String>> allMethodMatchers;
     private final AtomicReference<RequestHandler> requestHandler = new AtomicReference<>();
 
-    public PublicApiHandler(List<HttpServerRequestHandler> handlers, List<HttpServerInterceptor> interceptors, HttpServerConfig config) {
+    public PublicApiHandler(Collection<HttpServerRequestHandler> handlers, Collection<HttpServerInterceptor> interceptors, HttpServerConfig config) {
         this.pathTemplateMatcher = new HashMap<>();
         this.allMethodMatchers = new PathTemplateMatcher<>();
         for (var h : handlers) {
@@ -133,7 +130,7 @@ public class PublicApiHandler {
         private static final RequestHandler FINAL_HANDLER = (request, lastHandlerInChain) -> lastHandlerInChain.apply(request);
         private final RequestHandler chain;
 
-        private AggregatedRequestHandler(List<HttpServerInterceptor> interceptors) {
+        private AggregatedRequestHandler(Collection<HttpServerInterceptor> interceptors) {
             var chain = FINAL_HANDLER;
             for (var interceptor : interceptors) {
                 var remainingChain = chain;

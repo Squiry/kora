@@ -71,8 +71,8 @@ class GraphTest {
         var candidate1 = draw.addNode(String.class, null, matched, List.of(), List.of(), List.of(), g -> "");
         var candidate2 = draw.addNode(String.class, null, failed, List.of(), List.of(), List.of(), g -> "");
         var candidate3 = draw.addNode(String.class, null, failed, List.of(), List.of(), List.of(), g -> "");
-        var oneOf = Node.oneOf(String.class, null, List.of(candidate1, candidate2, candidate3));
-        draw.addNode(String.class, null, null, List.of(oneOf), List.of(), List.of(), g -> g.get(oneOf));
+        var oneOf = Node.oneOfNoMapper(String.class, null, List.of(candidate1, candidate2, candidate3));
+        draw.addNode(String.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(oneOf, false)), List.of(), List.of(), g -> g.get(oneOf));
 
         draw.init().release();
     }
@@ -86,8 +86,8 @@ class GraphTest {
         var candidate2 = draw.addNode(String.class, null, matched, List.of(), List.of(), List.of(), g -> "");
         var candidate3 = draw.addNode(String.class, null, failed, List.of(), List.of(), List.of(), g -> "");
 
-        var oneOf = Node.oneOf(String.class, null, List.of(candidate1, candidate2, candidate3));
-        draw.addNode(String.class, null, null, List.of(oneOf), List.of(), List.of(), g -> g.get(oneOf));
+        var oneOf = Node.oneOfNoMapper(String.class, null, List.of(candidate1, candidate2, candidate3));
+        draw.addNode(String.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(oneOf, false)), List.of(), List.of(), g -> g.get(oneOf));
 
         assertThatThrownBy(draw::init).hasSuppressedException(new IllegalStateException("""
             Multiple conditional components present in graph for type class java.lang.String
@@ -104,8 +104,8 @@ class GraphTest {
         var candidate2 = draw.addNode(String.class, null, failed, List.of(), List.of(), List.of(), g -> "");
         var candidate3 = draw.addNode(String.class, null, failed, List.of(), List.of(), List.of(), g -> "");
 
-        var oneOf = Node.oneOf(String.class, null, List.of(candidate1, candidate2, candidate3));
-        draw.addNode(String.class, null, null, List.of(oneOf), List.of(), List.of(), g -> g.get(oneOf));
+        var oneOf = Node.oneOfNoMapper(String.class, null, List.of(candidate1, candidate2, candidate3));
+        draw.addNode(String.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(oneOf, false)), List.of(), List.of(), g -> g.get(oneOf));
 
         assertThatThrownBy(draw::init).hasSuppressedException(new IllegalStateException("""
             All candidates for type class java.lang.String failed requirement to be present in graph:
@@ -485,10 +485,10 @@ class GraphTest {
         var counter = new AtomicInteger(0);
 
         var n1 = draw.addNode(TestObject.class, null, null, List.of(), List.of(), List.of(), _ -> "");
-        var n2 = draw.addNode(TestObject.class, null, null, List.of(n1), List.of(n1), List.of(), g -> object2.get());
-        var n3 = draw.addNode(TestObject.class, null, null, List.of(n1), List.of(n1), List.of(), g -> object3.get());
-        var n4 = draw.addNode(TestObject.class, null, null, List.of(n2, n3), List.of(n2, n3), List.of(), g -> object4.get());
-        var n5 = draw.addNode(TestObject.class, null, null, List.of(n4), List.of(n4), List.of(), g -> counter.incrementAndGet());
+        var n2 = draw.addNode(TestObject.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(n1, false)), List.of(n1), List.of(), g -> object2.get());
+        var n3 = draw.addNode(TestObject.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(n1, false)), List.of(n1), List.of(), g -> object3.get());
+        var n4 = draw.addNode(TestObject.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(n2, false), new ApplicationGraphDraw.CreateDependency(n3, false)), List.of(n2, n3), List.of(), g -> object4.get());
+        var n5 = draw.addNode(TestObject.class, null, null, List.of(new ApplicationGraphDraw.CreateDependency(n4, false)), List.of(n4), List.of(), g -> counter.incrementAndGet());
 
         var graph = draw.init();
 
@@ -524,17 +524,17 @@ class GraphTest {
         private final TestObjectFactory rootFactory = factory("root", absoluteTime, Set.of());
         private final Node<TestObject> rootNode = draw.addNode(TestObject.class, TAG, null, List.of(), List.of(), List.of(), rootFactory);
         private final TestObjectFactory object1Factory = factory("o1", absoluteTime, Set.of(), rootNode);
-        private final Node<TestObject> object1Node = draw.addNode(TestObject.class, TAG, null, List.of(rootNode), List.of(rootNode), List.of(), object1Factory);
+        private final Node<TestObject> object1Node = draw.addNode(TestObject.class, TAG, null, List.of(new ApplicationGraphDraw.CreateDependency(rootNode, false)), List.of(rootNode), List.of(), object1Factory);
         private final TestObjectFactory interceptor1Factory = factory("i1", absoluteTime, Set.of());
         private final Node<TestObject> interceptor1 = draw.addNode(TestObject.class, TAG, null, List.of(), List.of(), List.of(), interceptor1Factory);
         private final TestObjectFactory object2Factory = factory("o2", absoluteTime, Set.of(), rootNode);
-        private final Node<TestObject> object2Node = draw.addNode(TestObject.class, TAG, null, List.of(rootNode), List.of(rootNode), List.of(interceptor1), object2Factory);
+        private final Node<TestObject> object2Node = draw.addNode(TestObject.class, TAG, null, List.of(new ApplicationGraphDraw.CreateDependency(rootNode, false)), List.of(rootNode), List.of(interceptor1), object2Factory);
         private final TestObjectFactory object3Factory = factory("o3", absoluteTime, Set.of(), object1Node);
-        private final Node<TestObject> object3Node = draw.addNode(TestObject.class, TAG, null, List.of(object1Node), List.of(object1Node), List.of(), object3Factory);
+        private final Node<TestObject> object3Node = draw.addNode(TestObject.class, TAG, null, List.of(new ApplicationGraphDraw.CreateDependency(object1Node, false)), List.of(object1Node), List.of(), object3Factory);
         private final TestObjectFactory object4Factory = factory("o4", absoluteTime, Set.of(object2Node), object1Node);
-        private final Node<TestObject> object4Node = draw.addNode(TestObject.class, TAG, null, List.of(object1Node, object2Node), List.of(object1Node), List.of(), object4Factory);
+        private final Node<TestObject> object4Node = draw.addNode(TestObject.class, TAG, null, List.of(new ApplicationGraphDraw.CreateDependency(object1Node, false), new ApplicationGraphDraw.CreateDependency(object2Node, false)), List.of(object1Node), List.of(), object4Factory);
         private final TestObjectFactory object5Factory = factory("o5", absoluteTime, Set.of(), object2Node);
-        private final Node<TestObject> object5Node = draw.addNode(TestObject.class, TAG, null, List.of(object2Node), List.of(object2Node), List.of(), object5Factory);
+        private final Node<TestObject> object5Node = draw.addNode(TestObject.class, TAG, null, List.of(new ApplicationGraphDraw.CreateDependency(object2Node, false)), List.of(object2Node), List.of(), object5Factory);
 
         private final RefreshableGraph graph = this.draw.init();
 

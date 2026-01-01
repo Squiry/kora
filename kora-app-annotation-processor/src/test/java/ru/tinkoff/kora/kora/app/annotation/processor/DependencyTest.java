@@ -26,7 +26,7 @@ public class DependencyTest extends AbstractKoraAppTest {
             public interface ExampleApplication {
                 class TestClass1 {}
                 class TestClass2 {}
-
+            
                 default TestClass2 testClass2() { return new TestClass2(); }
                 @Root
                 default TestClass1 typeReference(TypeRef<TestClass2> object) { assert object != null; return new TestClass1(); }
@@ -49,7 +49,7 @@ public class DependencyTest extends AbstractKoraAppTest {
             public interface ExampleApplication {
                 class TestClass1 {}
                 class TestClass2 {}
-
+            
                 default TestClass2 testClass2() { return new TestClass2(); }
                 @Root
                 default TestClass1 valueOfReference(ValueOf<TestClass2> object) { assert object != null; return new TestClass1(); }
@@ -70,7 +70,7 @@ public class DependencyTest extends AbstractKoraAppTest {
             public interface ExampleApplication {
                 class TestClass1 {}
                 class TestClass2 {}
-
+            
                 @Root
                 default TestClass2 testClass2() { return new TestClass2(); }
                 @Root
@@ -92,7 +92,7 @@ public class DependencyTest extends AbstractKoraAppTest {
             public interface ExampleApplication {
                 class TestClass1 {}
                 class TestClass2 {}
-
+            
                 @Root
                 default TestClass1 nullableReference(@Nullable TestClass2 object) { return new TestClass1(); }
                 @Root
@@ -121,12 +121,12 @@ public class DependencyTest extends AbstractKoraAppTest {
                 class TestClass2 implements TestInterface1 {}
                 class TestClass3 implements TestInterface1 {}
                 class TestClass4 implements TestInterface1 {}
-
+            
                 @Root
                 default TestClass1 allOfInterface(All<TestInterface1> all) { return new TestClass1(); }
                 @Root
                 default TestClass1 allOfClass(All<TestClass2> all) { return new TestClass1(); }
-
+            
                 default TestClass2 testClass2() { return new TestClass2(); }
                 default TestClass3 testClass3() { return new TestClass3(); }
                 default TestClass4 testClass4() { return new TestClass4(); }
@@ -146,12 +146,12 @@ public class DependencyTest extends AbstractKoraAppTest {
                 class TestClass2 implements TestInterface1 {}
                 class TestClass3 implements TestInterface1 {}
                 class TestClass4 implements TestInterface1 {}
-
+            
                 @Root
                 default TestClass1 allOfValueOfInterface(All<ValueOf<TestInterface1>> all) { return new TestClass1(); }
                 @Root
                 default TestClass1 allOfValueOfClass(All<ValueOf<TestClass2>> all) { return new TestClass1(); }
-
+            
                 default TestClass2 testClass2() { return new TestClass2(); }
                 default TestClass3 testClass3() { return new TestClass3(); }
                 default TestClass4 testClass4() { return new TestClass4(); }
@@ -171,13 +171,13 @@ public class DependencyTest extends AbstractKoraAppTest {
                 class TestClass2 implements TestInterface1 {}
                 class TestClass3 implements TestInterface1 {}
                 class TestClass4 implements TestInterface1 {}
-
+            
                 @Root
                 default TestClass1 allOfPromiseOfInterface(All<PromiseOf<TestInterface1>> all) { return new TestClass1(); }
                 @Root
                 default TestClass1 allOfPromiseOfClass(All<PromiseOf<TestClass2>> all) { return new TestClass1(); }
-
-
+            
+            
                 default TestClass2 testClass2() { return new TestClass2(); }
                 default TestClass3 testClass3() { return new TestClass3(); }
                 default TestClass4 testClass4() { return new TestClass4(); }
@@ -195,14 +195,14 @@ public class DependencyTest extends AbstractKoraAppTest {
                 interface TestInterface1 {}
                 class TestClass1 {}
                 class TestClass2 implements TestInterface1{}
-
+            
                 @Root
                 default TestClass1 allOfNothingByClass(All<TestClass2> all) { return new TestClass1(); }
                 @Root
                 default TestClass1 allOfValueOfNothingByClass(All<ValueOf<TestClass2>> all) { return new TestClass1(); }
                 @Root
                 default TestClass1 allOfPromiseOfNothingByClass(All<PromiseOf<TestClass2>> all) { return new TestClass1(); }
-
+            
                 @Root
                 default TestClass1 allOfNothingByInterface(All<TestInterface1> all) { return new TestClass1(); }
                 @Root
@@ -216,58 +216,12 @@ public class DependencyTest extends AbstractKoraAppTest {
     }
 
     @Test
-    public void testDiscoveredFinalClassDependency() {
-        var draw = compile("""
-            @KoraApp
-            public interface ExampleApplication {
-                final class TestClass1 {}
-
-                @Root
-                default String test(TestClass1 testClass) { return ""; }
-            }
-            """);
-        assertThat(draw.getNodes()).hasSize(2);
-        draw.init();
-    }
-    @Test
-    public void testDiscoveredFinalClassDependencyWithGeneric() {
-        var draw = compile("""
-            @KoraApp
-            public interface ExampleApplication {
-                final class TestClass2{}
-                final class TestClass1<T> { public TestClass1(T t){}}
-
-                @Root
-                default String test(TestClass1<TestClass2> testClass) { return ""; }
-            }
-            """);
-        assertThat(draw.getNodes()).hasSize(3);
-        draw.init();
-    }
-
-    @Test
-    public void testDiscoveredFinalClassDependencyWithTag() {
-        var draw = compile("""
-            @KoraApp
-            public interface ExampleApplication {
-                @Tag(TestClass1.class)
-                final class TestClass1 {}
-
-                @Root
-                default String test(@Tag(TestClass1.class) TestClass1 testClass) { return ""; }
-            }
-            """);
-        assertThat(draw.getNodes()).hasSize(2);
-        draw.init();
-    }
-
-    @Test
     public void testDiscoveredFinalClassDependencyTaggedDependencyNoTagOnClass() {
         assertThatThrownBy(() -> compile("""
             @KoraApp
             public interface ExampleApplication {
                 final class TestClass1 {}
-
+            
                 @Root
                 default String test(@Tag(TestClass1.class) TestClass1 testClass) { return ""; }
             }
@@ -293,16 +247,138 @@ public class DependencyTest extends AbstractKoraAppTest {
                 interface TestInterface2 {}
                 class TestClass2 implements TestInterface1, TestInterface2 {}
                 class TestClass1 {}
-
+            
                 default TestInterface1 testInterface1(TestInterface2 p) { return new TestClass2(); }
                 default TestInterface2 testInterface2(TestInterface1 p) { return new TestClass2(); }
-
+            
                 @Root
                 default TestClass1 root(TestInterface1 testInterface1, TestInterface2 testInterface2) { return new TestClass1(); }
             }
             """);
         Assertions.assertThat(draw.getNodes()).hasSize(4);
         draw.init();
+    }
+
+    @Test
+    public void testConditionalComponentWorksWithExactlyOneMatch() throws Exception {
+        var draw = compile("""
+            @KoraApp
+            public interface ExampleApplication {
+                @Root
+                default String root(TestClass dependency, All<TestClass> allOf, All<ValueOf<TestClass>> allOfValue, All<PromiseOf<TestClass>> allOfPromise) { return ""; }
+            
+                class TestClass {}
+            
+                @Component
+                @Tag(Matched.class)
+                class Matched implements NodeCondition {
+                    @Override
+                    public ConditionResult eval() {
+                        return ConditionResult.matches();
+                    }
+                }
+            
+                @Component
+                @Tag(NonMatched.class)
+                class NonMatched implements NodeCondition {
+                    @Override
+                    public ConditionResult eval() {
+                        return ConditionResult.failed("test");
+                    }
+                }
+            
+                @Conditional(Matched.class)
+                default TestClass impl1() { return new TestClass(); }
+                @Conditional(NonMatched.class)
+                default TestClass impl2() { return new TestClass(); }
+                @Conditional(NonMatched.class)
+                default TestClass impl3() { return new TestClass(); }
+            }
+            """);
+
+        draw.init().release();
+    }
+
+    @Test
+    public void testConditionalComponentWorksWithZeroMatchesFails() throws Exception {
+        var draw = compile("""
+            @KoraApp
+            public interface ExampleApplication {
+                @Root
+                default String root(TestClass dependency) {
+                    return "";
+                }
+            
+                class TestClass {}
+            
+                @Component
+                @Tag(NonMatched.class)
+                class NonMatched implements NodeCondition {
+                    @Override
+                    public ConditionResult eval() {
+                        return ConditionResult.failed("test");
+                    }
+                }
+            
+                @Conditional(NonMatched.class)
+                default TestClass impl1() { return new TestClass(); }
+                @Conditional(NonMatched.class)
+                default TestClass impl2() { return new TestClass(); }
+                @Conditional(NonMatched.class)
+                default TestClass impl3() { return new TestClass(); }
+            }
+            """);
+
+        assertThatThrownBy(draw::init)
+            .hasSuppressedException(new IllegalStateException("""
+                All candidates for type class ru.tinkoff.kora.kora.app.annotation.processor.packageForDependencyTest.testConditionalComponentWorksWithZeroMatchesFails.ExampleApplication$TestClass failed requirement to be present in graph:
+                  - 1 class ru.tinkoff.kora.kora.app.annotation.processor.packageForDependencyTest.testConditionalComponentWorksWithZeroMatchesFails.ExampleApplication$TestClass
+                    * test
+                  - 2 class ru.tinkoff.kora.kora.app.annotation.processor.packageForDependencyTest.testConditionalComponentWorksWithZeroMatchesFails.ExampleApplication$TestClass
+                    * test
+                  - 3 class ru.tinkoff.kora.kora.app.annotation.processor.packageForDependencyTest.testConditionalComponentWorksWithZeroMatchesFails.ExampleApplication$TestClass
+                    * test
+                """));
+    }
+
+    @Test
+    public void testConditionalComponentFailsWithMultipleMatchedComponents() throws Exception {
+        var draw = compile("""
+            @KoraApp
+            public interface ExampleApplication {
+                @Root
+                default String root(TestClass dependency) {
+                    return "";
+                }
+            
+                class TestClass {}
+            
+                @Component
+                @Tag(Matched.class)
+                class Matched implements NodeCondition {
+                    @Override
+                    public ConditionResult eval() {
+                        return ConditionResult.matches();
+                    }
+                    public String toString() { return "test-condition"; }
+                }
+            
+                @Conditional(Matched.class)
+                default TestClass impl1() { return new TestClass(); }
+                @Conditional(Matched.class)
+                default TestClass impl2() { return new TestClass(); }
+                @Conditional(Matched.class)
+                default TestClass impl3() { return new TestClass(); }
+            }
+            """);
+
+        assertThatThrownBy(draw::init)
+            .hasSuppressedException(new IllegalStateException("""
+                Multiple conditional components present in graph for type class ru.tinkoff.kora.kora.app.annotation.processor.packageForDependencyTest.testConditionalComponentFailsWithMultipleMatchedComponents.ExampleApplication$TestClass
+                  - test-condition
+                  - test-condition
+                  - test-condition
+                """));
     }
 
 

@@ -3,7 +3,7 @@ package ru.tinkoff.kora.resilient.fallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,9 +15,9 @@ final class KoraFallbackManager implements FallbackManager {
 
     private final FallbackConfig configs;
     private final FallbackMetrics metrics;
-    private final List<FallbackPredicate> failurePredicates;
+    private final Collection<FallbackPredicate> failurePredicates;
 
-    KoraFallbackManager(FallbackConfig configs, List<FallbackPredicate> failurePredicates, FallbackMetrics metrics) {
+    KoraFallbackManager(FallbackConfig configs, Collection<FallbackPredicate> failurePredicates, FallbackMetrics metrics) {
         this.configs = configs;
         this.metrics = metrics;
         this.failurePredicates = failurePredicates;

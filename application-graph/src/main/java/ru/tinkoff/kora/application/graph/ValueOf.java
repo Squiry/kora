@@ -8,7 +8,7 @@ public interface ValueOf<T> {
 
     void refresh();
 
-    default <Q> ValueOf<Q> map(Function<T, Q> mapper) {
+    default <Q> ValueOf<Q> map(Function<T, ? extends Q> mapper) {
         return new ValueOf<>() {
             @Override
             public Q get() {
