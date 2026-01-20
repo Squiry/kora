@@ -1,5 +1,7 @@
 package ru.tinkoff.kora.kora.app.annotation.processor;
 
+import com.squareup.javapoet.ParameterizedTypeName;
+import com.squareup.javapoet.TypeName;
 import jakarta.annotation.Nullable;
 import ru.tinkoff.kora.annotation.processor.common.CommonUtils;
 import ru.tinkoff.kora.annotation.processor.common.ProcessingErrorException;
@@ -13,58 +15,16 @@ import ru.tinkoff.kora.kora.app.annotation.processor.exception.DuplicateDependen
 import javax.lang.model.element.*;
 import javax.lang.model.type.*;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
 import static ru.tinkoff.kora.kora.app.annotation.processor.component.DependencyClaim.DependencyClaimType.*;
 
 public final class GraphResolutionHelper {
 
-    private GraphResolutionHelper() { }
-
-    @Nullable
-    public static ComponentDependency.SingleDependency findDependency(ProcessingContext ctx, ComponentDeclaration forDeclaration, List<ResolvedComponent> resolvedComponents, DependencyClaim dependencyClaim) {
-        if (dependencyClaim.type().getKind() == TypeKind.ERROR) {
-            throw new ProcessingErrorException("Component error type dependency claim " + dependencyClaim.type(), forDeclaration.source());
-        }
-
-        var dependencies = findDependencies(ctx, resolvedComponents, dependencyClaim);
-        if (dependencies.size() == 1) {
-            return dependencies.get(0);
-        }
-        if (dependencies.isEmpty()) {
-            return null;
-        }
-
-        throw new DuplicateDependencyException(dependencies, dependencyClaim, forDeclaration);
-    }
-
-    public static List<ComponentDependency.SingleDependency> findDependencies(ProcessingContext ctx, List<ResolvedComponent> resolvedComponents, DependencyClaim dependencyClaim) {
-        var result = new ArrayList<ComponentDependency.SingleDependency>(4);
-        for (var resolvedComponent : resolvedComponents) {
-            if (!dependencyClaim.tagsMatches(resolvedComponent.tags())) {
-                continue;
-            }
-
-            var isDirectAssignable = ctx.types.isAssignable(resolvedComponent.type(), dependencyClaim.type());
-            var isWrappedAssignable = ctx.serviceTypeHelper.isAssignableToUnwrapped(resolvedComponent.type(), dependencyClaim.type());
-            if (!isDirectAssignable && !isWrappedAssignable) {
-                continue;
-            }
-
-            var targetDependency = isWrappedAssignable
-                ? new ComponentDependency.WrappedTargetDependency(dependencyClaim, resolvedComponent)
-                : new ComponentDependency.TargetDependency(dependencyClaim, resolvedComponent);
-
-            switch (dependencyClaim.claimType()) {
-                case ONE_REQUIRED, ONE_NULLABLE -> result.add(targetDependency);
-                case PROMISE_OF, NULLABLE_PROMISE_OF -> result.add(new ComponentDependency.PromiseOfDependency(dependencyClaim, targetDependency));
-                case VALUE_OF, NULLABLE_VALUE_OF -> result.add(new ComponentDependency.ValueOfDependency(dependencyClaim, targetDependency));
-                case ALL_OF_ONE, ALL_OF_PROMISE, ALL_OF_VALUE, TYPE_REF -> throw new IllegalStateException();
-            }
-        }
-        return result;
-    }
+    private GraphResolutionHelper() {}
 
     @Nullable
     public static ComponentDeclaration findFinalDependency(ProcessingContext ctx, DependencyClaim dependencyClaim) {
@@ -92,11 +52,16 @@ public final class GraphResolutionHelper {
         }
     }
 
-    public static List<ComponentDependency.SingleDependency> findDependenciesForAllOf(ProcessingContext ctx, DependencyClaim dependencyClaim, List<ResolvedComponent> resolvedComponents) {
+    public static List<ComponentDependency.SingleDependency> findDependenciesForAllOf(ProcessingContext ctx, DependencyClaim dependencyClaim, List<ResolvedComponent> resolvedComponents, Map<TypeName, List<ComponentDeclaration>> declarationTypeCache) {
+        var declarationsSet = new IdentityHashMap<ComponentDeclaration, ComponentDeclaration>();
+        declarationTypeCache.getOrDefault(TypeName.get(dependencyClaim.type()), List.of()).forEach(d -> declarationsSet.put(d, d));
         var claimType = dependencyClaim.claimType();
         var result = new ArrayList<ComponentDependency.SingleDependency>();
         components:
         for (var component : resolvedComponents) {
+            if (!declarationsSet.containsKey(component.declaration())) {
+                continue components;
+            }
             if (!dependencyClaim.tagsMatches(component.tags())) {
                 continue components;
             }
@@ -337,6 +302,80 @@ public final class GraphResolutionHelper {
         }
         return result;
     }
+
+    public static List<ComponentDeclaration> findDependencyDeclarations(ProcessingContext ctx, Map<TypeName, List<ComponentDeclaration>> sourceDeclarations, DependencyClaim dependencyClaim) {
+        var result = new ArrayList<ComponentDeclaration>();
+        var typeName = TypeName.get(dependencyClaim.type());
+        if (typeName instanceof ParameterizedTypeName ptn) {
+            typeName = ptn.rawType;
+        }
+        var declarations = sourceDeclarations.getOrDefault(typeName, List.of());
+        for (var sourceDeclaration : declarations) {
+            if (sourceDeclaration.isTemplate()) {
+                // not gonna happen
+                continue;
+            }
+            if (!dependencyClaim.tagsMatches(sourceDeclaration.tags())) {
+                continue;
+            }
+            if (ctx.types.isAssignable(sourceDeclaration.type(), dependencyClaim.type()) || ctx.serviceTypeHelper.isAssignableToUnwrapped(sourceDeclaration.type(), dependencyClaim.type())) {
+                result.add(sourceDeclaration);
+            }
+        }
+        return result;
+    }
+
+    @Nullable
+    public static ComponentDependency.SingleDependency findDependency(ProcessingContext ctx, ComponentDeclaration forDeclaration, List<ResolvedComponent> resolvedComponents, List<ComponentDeclaration> declarationFilter, DependencyClaim dependencyClaim) {
+        if (dependencyClaim.type().getKind() == TypeKind.ERROR) {
+            throw new ProcessingErrorException("Component error type dependency claim " + dependencyClaim.type(), forDeclaration.source());
+        }
+
+        var dependencies = findDependencies(ctx, declarationFilter, resolvedComponents, dependencyClaim);
+        if (dependencies.size() == 1) {
+            return dependencies.get(0);
+        }
+        if (dependencies.isEmpty()) {
+            return null;
+        }
+
+        throw new DuplicateDependencyException(dependencies, dependencyClaim, forDeclaration);
+    }
+
+    public static List<ComponentDependency.SingleDependency> findDependencies(ProcessingContext ctx, List<ComponentDeclaration> declarationFilter, List<ResolvedComponent> resolvedComponents, DependencyClaim dependencyClaim) {
+        var result = new ArrayList<ComponentDependency.SingleDependency>(4);
+        var set = new IdentityHashMap<ComponentDeclaration, ComponentDeclaration>();
+        for (var componentDeclaration : declarationFilter) {
+            set.put(componentDeclaration, componentDeclaration);
+        }
+        for (var resolvedComponent : resolvedComponents) {
+            if (!set.containsKey(resolvedComponent.declaration())) {
+                continue;
+            }
+            if (!dependencyClaim.tagsMatches(resolvedComponent.tags())) {
+                continue;
+            }
+
+            var isDirectAssignable = ctx.types.isAssignable(resolvedComponent.type(), dependencyClaim.type());
+            var isWrappedAssignable = ctx.serviceTypeHelper.isAssignableToUnwrapped(resolvedComponent.type(), dependencyClaim.type());
+            if (!isDirectAssignable && !isWrappedAssignable) {
+                continue;
+            }
+
+            var targetDependency = isWrappedAssignable
+                ? new ComponentDependency.WrappedTargetDependency(dependencyClaim, resolvedComponent)
+                : new ComponentDependency.TargetDependency(dependencyClaim, resolvedComponent);
+
+            switch (dependencyClaim.claimType()) {
+                case ONE_REQUIRED, ONE_NULLABLE -> result.add(targetDependency);
+                case PROMISE_OF, NULLABLE_PROMISE_OF -> result.add(new ComponentDependency.PromiseOfDependency(dependencyClaim, targetDependency));
+                case VALUE_OF, NULLABLE_VALUE_OF -> result.add(new ComponentDependency.ValueOfDependency(dependencyClaim, targetDependency));
+                case ALL_OF_ONE, ALL_OF_PROMISE, ALL_OF_VALUE, TYPE_REF -> throw new IllegalStateException();
+            }
+        }
+        return result;
+    }
+
 
     public static List<ComponentDeclaration> findInterceptorDeclarations(ProcessingContext ctx, List<ComponentDeclaration> sourceDeclarations, TypeMirror typeMirror) {
         var result = new ArrayList<ComponentDeclaration>();

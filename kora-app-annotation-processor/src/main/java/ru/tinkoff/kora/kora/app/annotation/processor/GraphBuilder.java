@@ -78,13 +78,14 @@ public class GraphBuilder {
                     resolvedDependencies.add(new ComponentDependency.TypeOfDependency(dependencyClaim));
                     continue dependency;
                 }
-                var dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, processing.resolvedComponents(), dependencyClaim);
+                var declarations = GraphResolutionHelper.findDependencyDeclarations(ctx, processing.typeToDeclMap(), dependencyClaim);
+                var dependencyComponent = GraphResolutionHelper.findDependency(ctx, declaration, processing.resolvedComponents(),declarations, dependencyClaim);
                 if (dependencyComponent != null) {
                     // there's matching component in graph
                     resolvedDependencies.add(dependencyComponent);
                     continue dependency;
                 }
-                var dependencyDeclaration = GraphResolutionHelper.findDependencyDeclaration(ctx, declaration, processing.sourceDeclarations(), dependencyClaim);
+                var dependencyDeclaration = GraphResolutionHelper.findDependencyDeclaration(ctx, declaration, declarations, dependencyClaim);
                 if (dependencyDeclaration != null) {
                     // component not yet resolved - adding it to the tail, resolving
                     stack.addLast(componentFrame.withCurrentDependency(currentDependency));
@@ -98,7 +99,7 @@ public class GraphBuilder {
                 if (!templates.isEmpty()) {
                     if (templates.size() == 1) {
                         var template = templates.get(0);
-                        processing.sourceDeclarations().add(template);
+                        processing.addSourceDeclaration(template);
                         stack.addLast(componentFrame.withCurrentDependency(currentDependency));
                         stack.addLast(new ProcessingState.ResolutionFrame.Component(
                             template, ComponentDependencyHelper.parseDependencyClaims(ctx, template)
@@ -113,12 +114,15 @@ public class GraphBuilder {
                             processing.root(),
                             processing.allModules(),
                             new ArrayList<>(processing.sourceDeclarations()),
+                            processing.typeToDeclMap().entrySet().stream()
+                                .map(e -> Map.entry(e.getKey(), new ArrayList<>(e.getValue())))
+                                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
                             new ArrayList<>(processing.templates()),
                             processing.rootSet(),
                             new ArrayList<>(processing.resolvedComponents()),
                             new ArrayDeque<>(processing.resolutionStack())
                         );
-                        newProcessing.sourceDeclarations().add(template);
+                        newProcessing.addSourceDeclaration(template);
                         newProcessing.resolutionStack().addLast(componentFrame.withCurrentDependency(currentDependency));
                         newProcessing.resolutionStack().addLast(new ProcessingState.ResolutionFrame.Component(
                             template, ComponentDependencyHelper.parseDependencyClaims(ctx, template)
@@ -156,7 +160,7 @@ public class GraphBuilder {
                 }
                 if (dependencyClaim.type().toString().startsWith("java.util.Optional<")) {
                     var optionalDeclaration = new ComponentDeclaration.OptionalComponent(dependencyClaim.type(), dependencyClaim.tags());
-                    processing.sourceDeclarations().add(optionalDeclaration);
+                    processing.addSourceDeclaration(optionalDeclaration);
                     stack.addLast(componentFrame.withCurrentDependency(currentDependency));
                     stack.addLast(new ProcessingState.ResolutionFrame.Component(
                         optionalDeclaration, List.of(ComponentDependencyHelper.parseClaim(componentFrame.declaration().source(), ((DeclaredType) dependencyClaim.type()).getTypeArguments().get(0), dependencyClaim.tags(), true))
@@ -165,7 +169,7 @@ public class GraphBuilder {
                 }
                 var finalClassComponent = GraphResolutionHelper.findFinalDependency(ctx, dependencyClaim);
                 if (finalClassComponent != null) {
-                    processing.sourceDeclarations().add(finalClassComponent);
+                    processing.addSourceDeclaration(finalClassComponent);
                     stack.addLast(componentFrame.withCurrentDependency(currentDependency));
                     stack.addLast(new ProcessingState.ResolutionFrame.Component(
                         finalClassComponent, ComponentDependencyHelper.parseDependencyClaims(ctx, finalClassComponent)
@@ -191,7 +195,7 @@ public class GraphBuilder {
                         if (extensionComponent.isTemplate()) {
                             processing.templates().add(extensionComponent);
                         } else {
-                            processing.sourceDeclarations().add(extensionComponent);
+                            processing.addSourceDeclaration(extensionComponent);
                         }
                         stack.addLast(componentFrame.withCurrentDependency(currentDependency));
                         continue frame;
@@ -202,7 +206,7 @@ public class GraphBuilder {
                         if (extensionComponent.isTemplate()) {
                             processing.templates().add(extensionComponent);
                         } else {
-                            processing.sourceDeclarations().add(extensionComponent);
+                            processing.addSourceDeclaration(extensionComponent);
                         }
                         stack.addLast(componentFrame.withCurrentDependency(currentDependency));
                         continue frame;
@@ -257,7 +261,7 @@ public class GraphBuilder {
                 }
             }
         }
-        return new ProcessingState.Ok(processing.root(), processing.allModules(), processing.resolvedComponents());
+        return new ProcessingState.Ok(processing.root(), processing.allModules(), processing.resolvedComponents(), processing.typeToDeclMap());
     }
 
     private static String getRequestedMessage(ComponentDeclaration declaration) {
@@ -487,7 +491,8 @@ public class GraphBuilder {
             var proxyDependencyClaim = new DependencyClaim(
                 dependencyClaimType, Set.of(CommonClassNames.promisedProxy.canonicalName()), dependencyClaim.claimType()
             );
-            var alreadyGenerated = GraphResolutionHelper.findDependency(ctx, prevComponent.declaration(), processing.resolvedComponents(), proxyDependencyClaim);
+            var alreadyGeneratedDeclrations = GraphResolutionHelper.findDependencyDeclarations(ctx, processing.typeToDeclMap(), proxyDependencyClaim);
+            var alreadyGenerated = GraphResolutionHelper.findDependency(ctx, prevComponent.declaration(), processing.resolvedComponents(), alreadyGeneratedDeclrations, proxyDependencyClaim);
             if (alreadyGenerated != null) {
                 processing.resolutionStack().removeLast();
                 prevComponent.resolvedDependencies().add(alreadyGenerated);
@@ -502,7 +507,7 @@ public class GraphBuilder {
                 if (proxyComponentDeclaration.isTemplate()) {
                     processing.templates().add(proxyComponentDeclaration);
                 } else {
-                    processing.sourceDeclarations().add(proxyComponentDeclaration);
+                    processing.addSourceDeclaration(proxyComponentDeclaration);
                 }
             }
             var proxyResolvedComponent = new ResolvedComponent(

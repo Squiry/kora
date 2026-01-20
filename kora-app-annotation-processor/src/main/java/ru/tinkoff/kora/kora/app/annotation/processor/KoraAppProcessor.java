@@ -20,6 +20,8 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
@@ -267,7 +269,39 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
         for (int i = 0; i < none.rootSet().size(); i++) {
             stack.addFirst(new ProcessingState.ResolutionFrame.Root(i));
         }
-        return new ProcessingState.Processing(none.root(), none.allModules(), none.sourceDeclarations(), none.templates(), none.rootSet(), new ArrayList<>(256), stack);
+        class Visitor {
+            void visit(Map<TypeName, IdentityHashMap<ComponentDeclaration, ComponentDeclaration>> map, TypeMirror type, ComponentDeclaration d) {
+                if (type.getKind() == TypeKind.NONE) {
+                    return;
+                }
+                var typeName = TypeName.get(type);
+                if (typeName instanceof ParameterizedTypeName ptn) {
+                    typeName = ptn.rawType;
+                }
+                map.computeIfAbsent(typeName, k -> new IdentityHashMap<>()).put(d, d);
+                if (type instanceof DeclaredType dt) {
+                    var typeElement = (TypeElement) dt.asElement();
+                    var wrappedType = ctx.serviceTypeHelper.wrappedType(type);
+                    if (wrappedType != null) {
+                        visit(map, wrappedType, d);
+                    }
+
+                    visit(map, typeElement.getSuperclass(), d);
+                    for (var anInterface : typeElement.getInterfaces()) {
+                        visit(map, anInterface, d);
+                    }
+                }
+            }
+        }
+        var map = new HashMap<TypeName, IdentityHashMap<ComponentDeclaration, ComponentDeclaration>>();
+        for (var declaration : none.sourceDeclarations()) {
+            new Visitor().visit(map, declaration.type(), declaration);
+        }
+        var typeToDeclCache = new HashMap<TypeName, List<ComponentDeclaration>>();
+        for (var entry : map.entrySet()) {
+            typeToDeclCache.put(entry.getKey(), new ArrayList<>(entry.getValue().keySet()));
+        }
+        return new ProcessingState.Processing(none.root(), none.allModules(), none.sourceDeclarations(), typeToDeclCache, none.templates(), none.rootSet(), new ArrayList<>(256), stack);
     }
 
     private ProcessingState parseNone(Element classElement) {
@@ -319,7 +353,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
             var sourceDescriptors = components.nonTemplates;
             var rootSet = sourceDescriptors.stream()
                 .filter(cd -> AnnotationUtils.isAnnotationPresent(cd.source(), CommonClassNames.root)
-                              || cd instanceof ComponentDeclaration.AnnotatedComponent ac && AnnotationUtils.isAnnotationPresent(ac.typeElement(), CommonClassNames.root))
+                    || cd instanceof ComponentDeclaration.AnnotatedComponent ac && AnnotationUtils.isAnnotationPresent(ac.typeElement(), CommonClassNames.root))
                 .toList();
             return new ProcessingState.None(type, allModules, sourceDescriptors, components.templates, rootSet);
         } catch (ProcessingErrorException e) {
@@ -331,14 +365,14 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
         var interceptors = ComponentInterceptors.parseInterceptors(this.ctx, ok.components());
 
         var applicationImplFile = this.generateImpl(type, ok.allModules());
-        var applicationGraphFile = this.generateApplicationGraph(type, ok.allModules(), interceptors, ok.components());
+        var applicationGraphFile = this.generateApplicationGraph(type, ok.allModules(), interceptors, ok.components(), ok.declarationMap());
 
         applicationImplFile.writeTo(this.processingEnv.getFiler());
         applicationGraphFile.writeTo(this.processingEnv.getFiler());
     }
 
 
-    private JavaFile generateApplicationGraph(Element classElement, List<TypeElement> allModules, ComponentInterceptors interceptors, List<ResolvedComponent> components) {
+    private JavaFile generateApplicationGraph(Element classElement, List<TypeElement> allModules, ComponentInterceptors interceptors, List<ResolvedComponent> components, Map<TypeName, List<ComponentDeclaration>> declarationTypeCache) {
         var packageElement = (PackageElement) classElement.getEnclosingElement();
         var implClass = ClassName.get(packageElement.getQualifiedName().toString(), "$" + classElement.getSimpleName().toString() + "Impl");
         var graphName = classElement.getSimpleName().toString() + "Graph";
@@ -401,7 +435,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
 
             currentClass.addField(FieldSpec.builder(ParameterizedTypeName.get(CommonClassNames.node, componentTypeName), component.fieldName(), Modifier.PRIVATE, Modifier.FINAL).build());
             currentConstructor.addStatement("var _type_of_$L = map.get($S)", component.fieldName(), component.fieldName());
-            var statement = this.generateComponentStatement(graphTypeName, allModules, interceptors, components, component);
+            var statement = this.generateComponentStatement(graphTypeName, allModules, interceptors, components, component, declarationTypeCache);
             currentConstructor.addStatement(statement);
         }
         if (components.size() > 0) {
@@ -441,7 +475,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
             .build();
     }
 
-    private CodeBlock generateComponentStatement(ClassName graphTypeName, List<TypeElement> allModules, ComponentInterceptors interceptors, List<ResolvedComponent> components, ResolvedComponent component) {
+    private CodeBlock generateComponentStatement(ClassName graphTypeName, List<TypeElement> allModules, ComponentInterceptors interceptors, List<ResolvedComponent> components, ResolvedComponent component, Map<TypeName, List<ComponentDeclaration>> declarationTypeCache) {
         var statement = CodeBlock.builder();
         var declaration = component.declaration();
         statement.add("$L = graphDraw.addNode0(_type_of_$L, ", component.fieldName(), component.fieldName());
@@ -450,7 +484,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
             statement.add("$L.class, ", tag);
         }
         statement.add("}, g -> ");
-        var dependenciesCode = this.generateDependenciesCode(component, graphTypeName, components);
+        var dependenciesCode = this.generateDependenciesCode(component, graphTypeName, components, declarationTypeCache);
 
         if (declaration instanceof ComponentDeclaration.AnnotatedComponent annotatedComponent) {
             statement.add("new $T", ClassName.get(annotatedComponent.typeElement()));
@@ -516,7 +550,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
         for (var resolvedDependency : resolvedDependencies) {
             if (resolvedDependency instanceof ComponentDependency.AllOfDependency allOf) {
                 if (allOf.claim().claimType() != DependencyClaim.DependencyClaimType.ALL_OF_PROMISE) {
-                    var dependencies = GraphResolutionHelper.findDependenciesForAllOf(ctx, allOf.claim(), components);
+                    var dependencies = GraphResolutionHelper.findDependenciesForAllOf(ctx, allOf.claim(), components, declarationTypeCache);
                     for (var dependency : dependencies) {
                         if (component.holderName().equals(dependency.component().holderName())) {
                             statement.add(", $N", dependency.component().fieldName());
@@ -549,7 +583,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
         return statement.build();
     }
 
-    private CodeBlock generateDependenciesCode(ResolvedComponent component, ClassName graphTypeName, List<ResolvedComponent> components) {
+    private CodeBlock generateDependenciesCode(ResolvedComponent component, ClassName graphTypeName, List<ResolvedComponent> components, Map<TypeName, List<ComponentDeclaration>> declarationTypeCache) {
         var resolvedDependencies = component.dependencies();
         if (resolvedDependencies.isEmpty()) {
             return CodeBlock.of("");
@@ -560,7 +594,7 @@ public class KoraAppProcessor extends AbstractKoraProcessor {
         for (int i = 0, dependenciesSize = resolvedDependencies.size(); i < dependenciesSize; i++) {
             if (i > 0) b.add(",\n");
             var resolvedDependency = resolvedDependencies.get(i);
-            b.add(resolvedDependency.write(this.ctx, graphTypeName, components));
+            b.add(resolvedDependency.write(this.ctx, graphTypeName, components, declarationTypeCache));
         }
         b.unindent();
         b.add("\n");
